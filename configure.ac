@@ -16,9 +16,12 @@ AC_PROG_SED
 # Parse configure option
 # - build
 AC_ARG_ENABLE([coupling],
-  [AS_HELP_STRING([--enable-coupling],[enable IPE coupling infrastructure (default: yes)])],
-  [],[enable_coupling=yes])
+  [AS_HELP_STRING([--enable-coupling],[enable IPE coupling infrastructure (default: no)])],
+  [enable_coupling=yes],[enable_coupling=no])
 AM_CONDITIONAL([COUPLED], [test x$enable_coupling = xyes])
+AC_ARG_ENABLE([esmf],
+  [AS_HELP_STRING([--disable-esmf],[disable ESMF checks (default: no)])],
+  [disable_esmf=yes],[disable_esmf=no])
 
 # Looks for Fortran compiler
 AC_LANG_PUSH([Fortran])
@@ -142,9 +145,11 @@ AS_IF([test "x$with_comio" = x],
 
 # - ESMF
 AX_LIB_ESMF
-AS_IF([test "$with_esmf" = no],
+AS_IF([test "$disable_esmf" = no], AS_IF([test "$with_esmf" = no],
   [AC_MSG_ERROR([Unable to find required ESMF library])],
   [ext_libs="${ext_libs} ESMF"])
+)
+
 
 # Adds library include paths
 fc_inc=

@@ -1,0 +1,18 @@
+#!/bin/bash
+#PBS -N wam-ipe_test
+#PBS -W group_list=s2901
+#PBS -l walltime=00:10:00
+#PBS -o fcst.log
+#PBS -j oe
+#PBS -l select=2:ncpus=28:mpiprocs=28:model=bro
+#PBS -q devel
+#PBS -W umask=022
+
+set -ax
+
+source /nobackup/akubaryk/lmod/lmod/init/bash
+module use -a ../modulefiles/pleiades.intel
+module load wam-ipe
+module list
+
+make -j test NP=40

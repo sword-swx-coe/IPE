@@ -10,8 +10,6 @@ MODULE IPE_Plasma_Class
   USE IPE_Common_Routines
   USE ipe_error_module
 
-  USE HDF5
-
   IMPLICIT NONE
 
   TYPE IPE_Plasma
@@ -120,14 +118,13 @@ MODULE IPE_Plasma_Class
 
 
 #ifdef HAVE_MPI
-  INTEGER, ALLOCATABLE, PRIVATE :: ion_requestHandle(:)
-  INTEGER, ALLOCATABLE, PRIVATE :: ion_requestStats(:,:)
+  integer, ALLOCATABLE, PRIVATE :: ion_requestHandle(:)
 #endif
 
 CONTAINS
 
   SUBROUTINE Build_IPE_Plasma( plasma, nFluxTube, NLP, NMP, mp_low, mp_high, halo, rc )
-    IMPLICIT NONE
+
     CLASS( IPE_Plasma ), INTENT(out) :: plasma
     INTEGER,             INTENT(in)  :: nFluxTube
     INTEGER,             INTENT(in)  :: NLP
@@ -175,15 +172,14 @@ CONTAINS
       plasma % conductivities          = 0.0_prec
 
 #ifdef HAVE_MPI
-      ALLOCATE( ion_requestHandle(1:16), ion_requestStats(MPI_STATUS_SIZE,1:16) )
+      ALLOCATE( ion_requestHandle(1:16))
       ion_requestHandle = 0
-      ion_requestStats  = 0
 #endif
 
   END SUBROUTINE Build_IPE_Plasma
 !
   SUBROUTINE Trash_IPE_Plasma( plasma, rc )
-    IMPLICIT NONE
+
     CLASS( IPE_Plasma ), INTENT(inout) :: plasma
     INTEGER, OPTIONAL,   INTENT(out)   :: rc
 
@@ -212,7 +208,7 @@ CONTAINS
       line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
 #ifdef HAVE_MPI
-    DEALLOCATE( ion_requestHandle, ion_requestStats, stat=stat )
+    DEALLOCATE( ion_requestHandle, stat=stat )
     IF ( ipe_dealloc_check( stat, msg="Unable to free up memory", &
       line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 #endif
@@ -222,7 +218,7 @@ CONTAINS
 
   SUBROUTINE Update_IPE_Plasma( plasma, grid, neutrals, forcing, time_tracker, mpi_layer, v_ExB, time_step, colfac, hpeq, &
                                 transport_highlat_lp, perp_transport_max_lp, rc )
-    IMPLICIT NONE
+
     CLASS( IPE_Plasma ),   INTENT(inout) :: plasma
     TYPE( IPE_Grid ),      INTENT(in)    :: grid
     TYPE( IPE_Neutrals ),  INTENT(in)    :: neutrals
@@ -305,13 +301,10 @@ CONTAINS
         CALL plasma % Update_Halos( grid, mpi_layer )
 
 #ifdef HAVE_MPI
-
-        CALL MPI_WAITALL( 16, &
-                         ion_requestHandle, &
-                         ion_requestStats, &
-                         mpiError)
-
-
+        if( mpi_layer % n_ranks > 1 ) CALL MPI_WAITALL( 16, &
+             ion_requestHandle, &
+             MPI_STATUSES_IGNORE, &
+             mpiError)
 #endif
 
         CALL plasma % Cross_Flux_Tube_Transport( grid, v_ExB, transport_time_step2, &
@@ -378,7 +371,7 @@ CONTAINS
   END SUBROUTINE Clean_Data
 
   SUBROUTINE Buffer_Old_State( plasma, grid )
-    IMPLICIT NONE
+
     CLASS( IPE_Plasma ), INTENT(inout) :: plasma
     TYPE( IPE_Grid ), INTENT(in)       :: grid
     ! Local
@@ -626,7 +619,7 @@ CONTAINS
                                     ion_velocities_pole_value, &
                                     electron_temperature_pole_value )
 
-    IMPLICIT NONE
+
     CLASS( IPE_Plasma ), INTENT(in)   :: plasma
     TYPE( IPE_Grid ), INTENT(in)      :: grid
     TYPE( IPE_MPI_Layer ), INTENT(in) :: mpi_layer
@@ -716,7 +709,7 @@ CONTAINS
 
   SUBROUTINE Test_Transport_Time_step( plasma, grid, v_ExB, time_step, mpi_layer, &
                                        max_transport_convection_ratio, perp_transport_max_lp )          
-    IMPLICIT NONE
+
     CLASS( IPE_Plasma ), INTENT(inout) :: plasma
     TYPE( IPE_Grid ), INTENT(in)       :: grid
     REAL(prec), INTENT(in)             :: v_ExB(1:3,1:grid % NLP, grid % mp_low:grid % mp_high)
@@ -761,7 +754,7 @@ CONTAINS
 
   SUBROUTINE Cross_Flux_Tube_Transport( plasma, grid, v_ExB, time_step, &
                                         transport_highlat_lp,perp_transport_max_lp, mpi_layer, rc )  
-    IMPLICIT NONE
+
     CLASS( IPE_Plasma ),   INTENT(inout) :: plasma
     TYPE( IPE_Grid ),      INTENT(in)    :: grid
     REAL(prec),            INTENT(in)    :: v_ExB(1:3,1:grid % NLP, grid % mp_low:grid % mp_high)
@@ -1099,7 +1092,7 @@ CONTAINS
 
   SUBROUTINE Auroral_Precipitation( plasma, grid, neutrals, forcing, time_tracker )
   ! Previously : tiros_ionize_ipe
-    IMPLICIT NONE
+
     CLASS( IPE_Plasma ), INTENT(inout) :: plasma
     TYPE( IPE_Grid ), INTENT(in)       :: grid
     TYPE( IPE_Neutrals ), INTENT(in)   :: neutrals
@@ -1362,7 +1355,7 @@ CONTAINS
 
 
   SUBROUTINE FLIP_Wrapper( plasma, grid, neutrals, forcing, time_tracker, flip_time_step, colfac, hpeq, nflag_t, nflag_d )
-    IMPLICIT NONE
+
     CLASS( IPE_Plasma ), INTENT(inout) :: plasma
     TYPE( IPE_Grid ), INTENT(in)       :: grid
     TYPE( IPE_Neutrals ), INTENT(in)   :: neutrals
@@ -1560,7 +1553,7 @@ CONTAINS
   END SUBROUTINE FLIP_Wrapper
 !
   FUNCTION Solar_Zenith_Angle( utime, day, colatitude, longitude, flux_tube_max ) RESULT( sza )
-    IMPLICIT NONE
+
     REAL(prec) :: utime
     INTEGER    :: day
     INTEGER    :: flux_tube_max               ! Number of flux tube points on this flux tube
@@ -1616,7 +1609,7 @@ CONTAINS
     ! this routine takes in the plasma, grid, and neutral fields and returns the six conductivities on IPE
     ! mp,lp grid. the output of this routine will likely need to be interpolated onto the dynamo solver grid
     ! before calling the dynamo solver
-    IMPLICIT NONE
+
     CLASS( IPE_Plasma ), INTENT(inout)  :: plasma
     TYPE( IPE_Grid ), INTENT(in)        :: grid
     TYPE( IPE_Neutrals ), INTENT(in)    :: neutrals
@@ -1865,7 +1858,7 @@ CONTAINS
 
 
   SUBROUTINE calc_collfreq(o1_cm3,o2_cm3,n2_cm3,tnti,tn,apex_Bmag,rnu_o2p,rnu_op,rnu_nop,rnu_ne,colfac)
-      IMPLICIT NONE
+
       REAL(prec), INTENT(in)::o1_cm3,o2_cm3,n2_cm3,tnti,tn,apex_Bmag,colfac
       REAL(prec), INTENT(out):: rnu_o2p,rnu_op,rnu_nop,rnu_ne
 
@@ -1960,7 +1953,7 @@ CONTAINS
       END SUBROUTINE calc_collfreq
 !
  SUBROUTINE IONNEUT_PLAS(P1,P2,P3,PI1,PI2,PI3,T,VIN,AMIn)
-  IMPLICIT NONE
+
   REAL(prec), INTENT(in) :: P1, P2, P3, PI1, PI2, PI3, T
   REAL(prec), INTENT(out) :: AMIn, VIN
   ! Local
@@ -1985,8 +1978,5 @@ CONTAINS
       AMIn = (PI1*mi1+PI2*mi2+PI3*mi3)*amu/sumPI
 
   END SUBROUTINE IONNEUT_PLAS
-!
-!
-!
 
 END MODULE IPE_Plasma_Class
