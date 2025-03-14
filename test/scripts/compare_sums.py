@@ -16,12 +16,13 @@ for line in lines:
     key, value = line.split()
     b[key] = value
 
-print('{:<29} {:<18} {:<18} {:<18}'.format('variable_name', 'sum_of_squares', 'reference', '|difference|'))
+print('{:<29} {:<18} {:<18} {:<18}'.format('variable_name', 'sum_of_squares', 'reference', '|difference|/reference'))
 for key in a.variables.keys():
     var = np.float64(a.variables[key][:])
     sum2 = np.sum(var**2)
     ref  = np.float64(b[key])
-    print('{:<28} {:+18.10e} {:+18.10e} {:+18.10e}'.format(key, sum2, ref, abs(sum2-ref)))
+    print('{:<28} {:+18.10e} {:+18.10e} {:+18.10e}'.format(key, sum2, ref,
+                                                           abs(sum2-ref)/ref))
 
 
 if __name__ == '__main__':
