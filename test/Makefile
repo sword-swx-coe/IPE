@@ -47,7 +47,7 @@ test_run:
 	cd run;	mpiexec -n $(NP) ./ipe.x > runlog
 
 test_check: regression
-	scripts/compare.py run/$(TESTFILE) regression/$(TESTFILE).derecho \
+	scripts/compare_sums.py run/$(TESTFILE) reference.txt \
 	> test.diff
 	@cat test.diff
 
