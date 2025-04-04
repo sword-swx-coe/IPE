@@ -694,11 +694,11 @@ module ipeCap
     end if
 
     ! -- advance IPE model
-    !call Update_IPE(ipe, clock, rc=rc)
-    !if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-    !  line=__LINE__,  &
-    !  file=__FILE__)) &
-    !  return  ! bail out
+    call Update_IPE(ipe, clock, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__,  &
+      file=__FILE__)) &
+      return  ! bail out
 
     ! -- export data
     nullify(fieldList, connectedList, standardNameList)
