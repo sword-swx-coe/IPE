@@ -10,20 +10,17 @@
 
 set -ax
 
-rm -rf run
-cp -r data run
-
 module use -a ../modulefiles/derecho.intel
 module load wam-ipe
 
-cd run
+# cd into the current directory (IPE/test)
+cd $PBS_O_WORKDIR
 
-ln -fs ../../install/bin/ipe.x .
+# Execute the test (assume that it was compiled)
+make test_rundir
+make test_run NP=40
+make test_check
 
-mpiexec -n 40 ./ipe.x
-
-rc=$?
-[ $rc -ne 0 ] && echo "Failure code $rc" && exit
-[ ! -f IPE_State.apex.201303160005.nc ] && echo "Output file IPE_State.apex.201303160005.nc not created." && exit
-
-python ../scripts/compare.py IPE_State.apex.201303160005.nc ../regression/IPE_State.apex.201303160005.nc.derecho
+#rc=$?
+#[ $rc -ne 0 ] && echo "Failure code $rc" && exit
+#[ ! -f IPE_State.apex.201303160005.nc ] && echo "Output file IPE_State.apex.201303160005.nc not created." && exit

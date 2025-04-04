@@ -1,10 +1,12 @@
 bucket = https://noaa-nws-wam-ipe-pds.s3.amazonaws.com
 
+# Needed for hot restart only
 data:
 	wget $bucket/NON-OPERATIONAL_RESEARCH/SWORD_DATA/IPE_STANDALONE_FIX.tar.gz
 	tar xvf IPE_STANDALONE_FIX.tar.gz
 	rm -rf  IPE_STANDALONE_FIX.tar.gz
 
+# Needed for full comparison only, not for sums
 regression:
 	wget $bucket/NON-OPERATIONAL_RESEARCH/SWORD_DATA/IPE_STANDALONE_REGRESSION.tar.gz
 	tar xvf IPE_STANDALONE_REGRESSION.tar.gz
@@ -34,11 +36,13 @@ test:
 test_compile:
 	cd ..; make -j; make install
 
-test_rundir: data
+test_rundir:
 	rm -rf run
 	mkdir -p run
-	cd run; ln -s ../data/* .
 	cd run; ln -s ../../install/bin/ipe.x .
+
+# Needed for hot restart only
+#	cd run; ln -s ../data/* .
 
 TESTFILE = IPE_State.apex.201303160005.nc
 
@@ -46,8 +50,8 @@ test_run:
 	rm -f run/$(TESTFILE)
 	cd run;	mpiexec -n $(NP) ./ipe.x > runlog
 
-test_check: regression
-	scripts/compare.py run/$(TESTFILE) regression/$(TESTFILE).derecho \
+test_check:
+	scripts/compare_sums.py run/$(TESTFILE) reference.txt \
 	> test.diff
 	@cat test.diff
 

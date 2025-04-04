@@ -20,3 +20,4 @@ test/data
 test/run
 test/regression
 test/fcst.log
+test/test.diff
