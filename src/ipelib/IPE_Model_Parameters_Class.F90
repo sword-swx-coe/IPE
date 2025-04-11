@@ -39,6 +39,7 @@ MODULE IPE_Model_Parameters_Class
     INTEGER    :: mesh_write
     INTEGER    :: import_write
     INTEGER    :: export_write
+    LOGICAL    :: ipe_has_import
     CHARACTER(200) :: mesh_write_file
 
     ! >> Fixed parameters
@@ -133,6 +134,7 @@ CONTAINS
     INTEGER        :: mesh_write
     INTEGER        :: import_write
     INTEGER        :: export_write
+    LOGICAL        :: ipe_has_import
     CHARACTER(200) :: mesh_write_file
     LOGICAL        :: dynamo_efield
     ! >> Fixed parameters
@@ -166,7 +168,7 @@ CONTAINS
 
     ! Communication buffers
     CHARACTER(LEN=200), DIMENSION( 6) :: sbuf
-    INTEGER,            DIMENSION(26) :: ibuf
+    INTEGER,            DIMENSION(27) :: ibuf
     REAL(prec),         DIMENSION(26) :: rbuf
 
 
@@ -180,7 +182,7 @@ CONTAINS
     NAMELIST / FileIO          / read_apex_neutrals, read_geographic_neutrals, write_apex_neutrals, write_geographic_neutrals, &
                                  write_geographic_eldyn, write_apex_eldyn, file_output_frequency, file_prefix, file_extension
     NAMELIST / IPECAP          / mesh_height_min, mesh_height_max, mesh_fill, mesh_write, mesh_write_file, &
-                                 import_write, export_write
+                                 import_write, export_write, ipe_has_import
     NAMELIST / ElDyn           / dynamo_efield
     NAMELIST / OPERATIONAL     / colfac, offset1_deg, offset2_deg, potential_model, hpeq, &
                                  transport_highlat_lp, perp_transport_max_lp, vertical_wind_limit
@@ -248,6 +250,7 @@ CONTAINS
     mesh_write = 0
     import_write = 0
     export_write = 0
+    ipe_has_import = .TRUE.
     mesh_write_file = 'ipemesh'
 
     ! ElDyn !
@@ -330,10 +333,11 @@ CONTAINS
       IF ( write_apex_eldyn          ) ibuf(21) = 1
       IF ( params % use_f107_kp_file ) ibuf(22) = 1
       IF ( dynamo_efield             ) ibuf(23) = 1
+      IF ( ipe_has_import            ) ibuf(24) = 1
       ! -- integers for operations
-      ibuf(24) = potential_model
-      ibuf(25) = transport_highlat_lp
-      ibuf(26) = perp_transport_max_lp
+      ibuf(25) = potential_model
+      ibuf(26) = transport_highlat_lp
+      ibuf(27) = perp_transport_max_lp
 
       ! -- reals
       rbuf = (/ time_step, start_time, end_time, msis_time_step, solar_forcing_time_step, &
@@ -369,22 +373,25 @@ CONTAINS
     params % f107_kp_read_in_start     = ibuf(6)
     params % mesh_fill                 = ibuf(7)
     params % mesh_write                = ibuf(8)
-    params % f107_flag                 = ibuf(9)
-    params % kp_flag                   = ibuf(10)
-    params % ap_flag                   = ibuf(11)
-    params % nhemi_power_index         = ibuf(12)
-    params % shemi_power_index         = ibuf(13)
-    params % read_apex_neutrals        = ( ibuf(14) == 1 )
-    params % read_geographic_neutrals  = ( ibuf(15) == 1 )
-    params % write_apex_neutrals       = ( ibuf(16) == 1 )
-    params % write_geographic_neutrals = ( ibuf(17) == 1 )
-    params % write_geographic_eldyn    = ( ibuf(18) == 1 )
-    params % write_apex_eldyn          = ( ibuf(19) == 1 )
-    params % use_f107_kp_file          = ( ibuf(20) == 1 )
-    params % dynamo_efield             = ( ibuf(21) == 1 )
-    params % potential_model           = ibuf(22)
-    params % transport_highlat_lp      = ibuf(23)
-    params % perp_transport_max_lp     = ibuf(24)
+    params % import_write              = ibuf(9)
+    params % export_write              = ibuf(10)
+    params % f107_flag                 = ibuf(11)
+    params % kp_flag                   = ibuf(12)
+    params % ap_flag                   = ibuf(13)
+    params % nhemi_power_index         = ibuf(14)
+    params % shemi_power_index         = ibuf(15)
+    params % read_apex_neutrals        = ( ibuf(16) == 1 )
+    params % read_geographic_neutrals  = ( ibuf(17) == 1 )
+    params % write_apex_neutrals       = ( ibuf(18) == 1 )
+    params % write_geographic_neutrals = ( ibuf(19) == 1 )
+    params % write_geographic_eldyn    = ( ibuf(20) == 1 )
+    params % write_apex_eldyn          = ( ibuf(21) == 1 )
+    params % use_f107_kp_file          = ( ibuf(22) == 1 )
+    params % dynamo_efield             = ( ibuf(23) == 1 )
+    params % ipe_has_import            = ( ibuf(24) == 1 )
+    params % potential_model           = ibuf(25)
+    params % transport_highlat_lp      = ibuf(26)
+    params % perp_transport_max_lp     = ibuf(27)
 
 #ifdef HAVE_MPI
     CALL MPI_BCAST( rbuf, size(rbuf), mpi_layer % mpi_prec, 0, mpi_layer % mpi_communicator, ierr )
