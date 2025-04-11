@@ -21,7 +21,7 @@
       use dynamo_module,only:zigm11,zigm22,zigmc,zigm2,rim,phim,phihm   &
      &,isolve,ncee,cee,nc,nc0,nc1,nc2,nc3,nc4,cofum,rhs,c0,c1,c2,c3,c4  &
      &,kmlon0,kmlon1,kmlon2,kmlon3,kmlon4,kmlat0,kmlat1,kmlat2,kmlat3   &
-     &,kmlat4,pfrac,jn,jp
+     &,kmlat4,pfrac,jn,jp,zigm1122
       use cons_module,only: dlatm,dlonm,pi_dyn,xlatm,rtd
       use module_transf,ONLY:transf
       use module_rhspde,ONLY:rhspde
@@ -78,12 +78,13 @@
 ! -sign of K_(m lam)^D in southern hemisphere is reversed, therefore 
 !     K_(m lam)^N - (- K_(m lam)^S)
 !
-! zigm11 = Sigma_(phi phi)(0)^T
-! zigm22 = Sigma_(lam lam)(0)^T
-! zigmc  =-Sigma_c(0)^T 
-! zigm2  = Sigma_h(0)^T 
-! rim(1) = K_(m phi)^D(0)^T
-! rim(2) = K_(m lam)^D(0)^T
+! zigm11   = Sigma_(phi phi)(0)^T
+! zigm22   = Sigma_(lam lam)(0)^T
+! zigmc    =-Sigma_c(0)^T 
+! zigm2    = Sigma_h(0)^T 
+! rim(1)   = K_(m phi)^D(0)^T
+! rim(2)   = K_(m lam)^D(0)^T
+! zigm1122 = (zigm11*zigm22)^0.5
 !
 
 
@@ -237,6 +238,13 @@
 
 !
       endif ! isolve
+!
+! Calculate (zigm11*zigm22)^0.5
+      do j=1,kmlath
+        do i=1,kmlonp1
+          zigm1122(i,j) = sqrt(zigm11(i,j)*zigm22(i,j))
+        enddo ! i=1,kmlonp1
+      enddo ! j=1,kmlath
 !
 ! Insert RHS in finest stencil (formerly sub rths):
       do j = 1,kmlat0

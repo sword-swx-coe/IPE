@@ -25,10 +25,11 @@ module ipeCap
     model_label_DataInitialize => label_DataInitialize, &
     model_label_Advance        => label_Advance,        &
     model_label_Finalize       => label_Finalize
+  use NUOPC_Model, only: NUOPC_ModelGet
 
   use ipeMethods
   use IPE_Wrapper
-  use dynamo_module, only: zigm2, zigm11, zigm22
+  use dynamo_module, only: zigm2, zigm1122
   use params_module, only: kmlonp1, kmlat
 
   implicit none
@@ -427,10 +428,11 @@ module ipeCap
     integer, intent(out) :: rc
     
     ! local variables
-    type(ESMF_State)     :: importState
-
-    integer :: verbosity
+    type(ESMF_Field) :: field
+    type(ESMF_State) :: exportState
+    integer :: verbosity, item, itemCount
     character(len=ESMF_MAXSTR) :: name
+    character(ESMF_MAXSTR), allocatable :: itemNameList(:)
 
     ! local parameters
     character(len=*), parameter :: rName = "DataInitialize"
@@ -445,6 +447,13 @@ module ipeCap
       file=__FILE__)) &
       return  ! bail out
 
+    ! Get export state
+    call NUOPC_ModelGet(gcomp, exportState=exportState, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__,  &
+      file=__FILE__)) &
+      return  ! bail out
+
     ! intro
     call NUOPC_LogIntro(name, rName, verbosity, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
@@ -452,14 +461,48 @@ module ipeCap
       file=__FILE__)) &
       return  ! bail out
 
-    ! -> set InitializeDataComplete Component Attribute to "true", indicating
-    ! to the driver that this Component has fully initialized its data
-    call NUOPC_CompAttributeSet(gcomp, &
-      name="InitializeDataComplete", value="true", rc=rc)
+    ! Get items
+    call ESMF_StateGet(exportState, itemCount=itemCount, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
       line=__LINE__,  &
       file=__FILE__)) &
       return  ! bail out
+
+    if (.not. allocated(itemNameList)) then
+       allocate(itemNameList(itemCount))
+    end if
+
+    call ESMF_StateGet(exportState, itemNameList=itemNameList, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__,  &
+      file=__FILE__)) &
+      return  ! bail out
+
+    ! Loop over fields and mark them updated
+    do item = 1, itemCount
+       call ESMF_StateGet(exportState, itemName=trim(itemNameList(item)), field=field, rc=rc)
+       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__,  &
+         file=__FILE__)) &
+         return  ! bail out
+
+       call NUOPC_SetAttribute(field, name="Updated", value="true", rc=rc)
+       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__,  &
+         file=__FILE__)) &
+         return  ! bail out
+    end do
+
+    ! -> set InitializeDataComplete Component Attribute to "true", indicating
+    ! to the driver that this Component has fully initialized its data
+    if (NUOPC_IsUpdated(exportState)) then
+       call NUOPC_CompAttributeSet(gcomp, name="InitializeDataComplete", value="true", rc=rc)
+       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+         line=__LINE__,  &
+         file=__FILE__)) &
+         return  ! bail out
+       call ESMF_LogWrite("IPE - Initialize-Data-Dependency SATISFIED!!!", ESMF_LOGMSG_INFO)
+    endif
         
     ! extro
     call NUOPC_LogExtro(name, rName, verbosity, rc=rc)
@@ -775,7 +818,7 @@ module ipeCap
           case ("hall_conductance")
             modelPtr2d(1:kmlonp1,1:kmlat) => zigm2(:,:)
           case ("pedersen_conductance")
-            modelPtr2d(1:kmlonp1,1:kmlat) => sqrt(zigm11(:,:)*zigm22(:,:))
+            modelPtr2d(1:kmlonp1,1:kmlat) => zigm1122(:,:)
           case default
             ! -- unavailable neutrals array, skip it
             cycle
@@ -807,6 +850,7 @@ module ipeCap
               return  ! bail out
           end if
         end if
+
         if (associated(modelPtr2d)) then
           ! --- get field data
           nullify(fieldPtr2d)
@@ -828,8 +872,9 @@ module ipeCap
           end do
 
           ! -- write export fields
+          print*, trim(standardNameList(item)), associated(modelPtr2d), (ipe % parameters % export_write > 0)
           if (ipe % parameters % export_write > 0) then
-            call ESMF_FieldWrite(fieldList(item), "ipe_export_"//trim(timeStr), overwrite=.true., rc=rc)
+            call ESMF_FieldWrite(fieldList(item), "ipe_export_"//trim(timeStr)//".nc", overwrite=.true., rc=rc)
             if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
               line=__LINE__,  &
               file=__FILE__)) &

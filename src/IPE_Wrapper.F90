@@ -136,13 +136,15 @@ CONTAINS
       FILE=__FILE__, &
       rcToReturn=rc) ) RETURN  ! bail out
 
-    CALL ipe % Update( rc=localrc )
-    IF( localrc /= IPE_SUCCESS ) THEN
-      CALL ESMF_LogSetError(ESMF_RC_INTNRL_BAD, msg="Error updating IPE", &
-        line=__LINE__, &
-        file=__FILE__, &
-        rcToReturn=rc)
-      RETURN
+    IF (ipe % parameters % ipe_has_import) then
+      CALL ipe % Update( rc=localrc )
+      IF( localrc /= IPE_SUCCESS ) THEN
+        CALL ESMF_LogSetError(ESMF_RC_INTNRL_BAD, msg="Error updating IPE", &
+          line=__LINE__, &
+          file=__FILE__, &
+          rcToReturn=rc)
+        RETURN
+      ENDIF
     ENDIF
 
     currTime = currTime + timeStep
