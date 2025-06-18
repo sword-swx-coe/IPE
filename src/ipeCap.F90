@@ -872,7 +872,6 @@ module ipeCap
           end do
 
           ! -- write export fields
-          print*, trim(standardNameList(item)), associated(modelPtr2d), (ipe % parameters % export_write > 0)
           if (ipe % parameters % export_write > 0) then
             call ESMF_FieldWrite(fieldList(item), "ipe_export_"//trim(timeStr)//".nc", overwrite=.true., rc=rc)
             if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
