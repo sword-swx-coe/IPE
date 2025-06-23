@@ -638,7 +638,7 @@ module ipeCap
         return  ! bail out
     end if
 
-    if (associated(fieldList)) then
+    if (size(fieldList, dim=1) > 0) then
 
       if (.not.associated(this % nodeToIndexMap)) then
         call ESMF_LogSetError(ESMF_RC_PTR_NOTALLOC, &
@@ -753,7 +753,7 @@ module ipeCap
       file=__FILE__)) &
       return  ! bail out
 
-    if (associated(fieldList)) then
+    if (size(fieldList, dim=1) > 0) then
 
       if (.not.associated(this % nodeToIndexMap)) then
         call ESMF_LogSetError(ESMF_RC_PTR_NOTALLOC, &
