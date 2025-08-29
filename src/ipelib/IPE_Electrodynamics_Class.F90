@@ -866,6 +866,30 @@ CONTAINS
       rim(:,j,2) = -rim(:,j,2)
     enddo
 
+!
+!nm20250620 Output conductance
+    IF( mpi_layer % rank_id == 0 )THEN
+      !print*,'*********************************'
+      write(6,898) time_tracker % year, time_tracker % month, time_tracker % day, &
+                    time_tracker % hour, time_tracker % minute
+ 898  format('*****output conductance zigm: ', i4,x,i2.2,x,i2.2,2x,i2.2,':'i2.2)
+      print*,'(26)zigm11: min=',MINVAL(zigm11),' max=',MAXVAL(zigm11)
+      print*,'(26)zigm2: min=',MINVAL(zigm2),' max=',MAXVAL(zigm2)
+      mlat0: do j=1,kmlat
+        mlon0: do i=1,kmlon
+          write(unit=4026,FMT='(4E12.4)') &
+            (xlonm(i)*180./pi_dyn)      &
+           ,(xlatm(j)*180./pi_dyn) &     
+           ,zigm2(i,j) &
+           ,( sqrt(zigm11(i,j)*zigm22(i,j)) )
+
+        enddo mlon0
+      enddo mlat0     
+      print*,'*****(26)end output conductance'
+      !print *,'*********************************'
+    END IF !( mpi_layer % rank_id == 0 )THEN
+!
+
 ! // TODO // !
 ! HEY YOU ! PAY ATTENTION *!
 ! Can we push the dynamo grid to match the IPE grid (NMP,2*NLP)?

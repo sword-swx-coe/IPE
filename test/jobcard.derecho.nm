@@ -27,6 +27,7 @@ REFERENCE_FILE="/glade/derecho/scratch/akubaryk/IPE/test/regression/"${OUTPUT_FI
 #    rm -rf "$RUN_DIR"
 #fi
 
+RUN_DIR=${PATH0}"/test/run"
 if [ -d "$DATA_DIR" ]; then
     cp -r "$DATA_DIR" "$RUN_DIR"
 else
@@ -36,11 +37,16 @@ fi
 
 # Load necessary modules
 module use -a ../modulefiles/derecho.intel
+echo "module load wam-ipe"
 module load wam-ipe
 
+echo "module load hdf5/1.14.0"
+module load hdf5/1.14.0
+
+echo "module list"
+module list
 
 # Change to run directory
-RUN_DIR=${PATH0}"/test/run"
 cd "$RUN_DIR" || { echo "Failed to change directory to $RUN_DIR"; exit 1; }
 
 
