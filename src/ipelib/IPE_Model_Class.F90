@@ -336,7 +336,7 @@ CONTAINS
     IF ( PRESENT( rc ) ) rc = IPE_FAILURE
 
     ! Determine initialization type from parameters
-    is_cold_start = .true.
+    is_cold_start = .false.
         
     if (is_cold_start) then
       call Cold_Start_Initialize(ipe, localrc)
