@@ -29,7 +29,6 @@ module ipeCap
 
   use ipeMethods
   use IPE_Wrapper
-  use dynamo_module, only: zigm2, zigm1122
   use params_module, only: kmlonp1, kmlat
 
   implicit none
@@ -542,7 +541,7 @@ module ipeCap
     character(len=ESMF_MAXSTR), pointer :: connectedList(:)
     real(ESMF_KIND_R8), dimension(:),     pointer :: fieldPtr
     real(ESMF_KIND_R8), dimension(:,:),   pointer :: fieldPtr2d
-    real,               dimension(:,:),   pointer :: modelPtr2d
+    real(prec),         dimension(:,:),   pointer :: modelPtr2d
     real(prec),         dimension(:,:,:), pointer :: modelPtr3d
 
     ! local parameters
@@ -816,9 +815,9 @@ module ipeCap
           case ("upward_exb_velocity")
             modelPtr3d(kps:,lps:,mps:) => ipe % eldyn % v_exb_geographic(3,:,:,:)
           case ("hall_conductance")
-            modelPtr2d(1:kmlonp1,1:kmlat) => zigm2(:,:)
+            modelPtr2d(1:kmlonp1,1:kmlat) => ipe % eldyn % geomag_hall_conductivity(:,:)
           case ("pedersen_conductance")
-            modelPtr2d(1:kmlonp1,1:kmlat) => zigm1122(:,:)
+            modelPtr2d(1:kmlonp1,1:kmlat) => ipe % eldyn % geomag_pedersen_conductivity(:,:)
           case default
             ! -- unavailable neutrals array, skip it
             cycle
