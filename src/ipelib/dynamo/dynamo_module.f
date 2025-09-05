@@ -118,8 +118,7 @@
      &  zigm11,                                                         &! sigma11*cos(theta0)
      &  zigmc,                                                          &! sigmac
      &  zigm2,                                                          &! sigma2
-     &  zigm22,                                                         &! sigma22/cos(theta0)
-     &  zigm1122                                                         ! sqrt(zigm11*zigm22)
+     &  zigm22                                                           ! sigma22/cos(theta0)
 !
 ! rim(1)=id(1), rim(2)=id(2)/cos(theta0)
       real,dimension(kmlonp1,kmlat,2) :: rim 

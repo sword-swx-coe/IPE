@@ -1068,7 +1068,8 @@ contains
       line=__LINE__, &
       file=__FILE__, &
       rcToReturn=rc)) return
-    write(msg, fmt='(a,i)') 'IPE size(Lon_I) = ', size(Lon_I)
+    write(msg, fmt='(a,4i)') 'IPE Lon_I imin, imax = ', &
+      lbound(Lon_I, dim=1), ubound(Lon_I, dim=1)
     call ESMF_LogWrite(trim(msg), ESMF_LOGMSG_INFO)
 
     nullify(Lat_I)
@@ -1078,7 +1079,8 @@ contains
       line=__LINE__, &
       file=__FILE__, &
       rcToReturn=rc)) return
-    write(msg, fmt='(a,i)') 'IPE size(Lat_I) = ', size(Lat_I)
+    write(msg, fmt='(a,4i)') 'IPE Lat_I jmin, jmax = ', &
+      lbound(Lat_I, dim=1), ubound(Lat_I, dim=1)
     call ESMF_LogWrite(trim(msg), ESMF_LOGMSG_INFO)
 
     ! -- uniform longitude grid from -180 to 180
