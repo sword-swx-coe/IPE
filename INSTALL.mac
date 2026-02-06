@@ -5,10 +5,7 @@ sudo -s
 gcc --version
 gcc-mp-13 (MacPorts gcc13 13.2.0_4+stdlib_flag) 13.2.0
 
-# Install hdf5 with gfortran, gcc, mpich
-port install hdf5 +gfortran +mpich
-
-# Install mpich with gcc13
+# Install mpich with gcc13 or newer
 port install mpich-gcc13
 # select mpich with port (or link files into the path)
 port select --set mpi mpich-gcc13-fortran
@@ -39,7 +36,7 @@ pip install netCDF4
 cd
 gitclone COMIO COMIOSRCDIR
 cd COMIOSRCDIR
-./configure --with-hdf5 --with-pnetcdf
+./configure --with-pnetcdf
 make
 sudo make install # this installs into /usr/local/lib/libcomio.a
 
