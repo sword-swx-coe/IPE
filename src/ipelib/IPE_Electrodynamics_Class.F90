@@ -886,7 +886,7 @@ CONTAINS
       print*,'(26)zigm11: min=',MINVAL(zigm11),' max=',MAXVAL(zigm11)
       print*,'(26)zigm2: min=',MINVAL(zigm2),' max=',MAXVAL(zigm2)
       mlat0: do j=1,kmlat
-        mlon0: do i=1,kmlon
+        mlon0: do i=1,kmlonp1 !=kmlon+1
           write(unit=4026,FMT='(4E12.4)') &
             (xlonm(i)*180./pi_dyn)      &
            ,(xlatm(j)*180./pi_dyn) &     

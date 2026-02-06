@@ -1,0 +1,15 @@
+#!/bin/bash
+#SBATCH -J standaloneIPE
+#SBATCH -A swpc
+#SBATCH -t 00:10:00
+#SBATCH -o fcst.log
+#SBATCH -n 40
+#SBATCH -q batch
+
+set -ax
+
+module use -a ../modulefiles/hera.intel
+module load wam-ipe
+
+make -j test NP=40
+

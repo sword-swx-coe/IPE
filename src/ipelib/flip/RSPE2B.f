@@ -67,7 +67,11 @@ C... FRPAS= fraction of flux lost in plasmasphere
       DATA IDGE/201*0/, F107SV/0.0/
 
       iemax = 0
-
+      ! Need to initialize these rates (Aaron Ridley)
+      rjox = 0.0
+      rjn2 = 0.0
+      rjhe = 0.0
+      rjo2 = 0.0
       !.. POSSIBLE speed up options - basic speed is 83 seconds
       !.. 1) lower ZPROD to 600 km - saves 2 seconds 
       !.. 2) Change Energy grid in ECELLS(30.0,800.0,3.0,99.0, saves 11 secs
