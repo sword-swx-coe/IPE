@@ -899,10 +899,22 @@ CONTAINS
     END IF !( mpi_layer % rank_id == 0 )THEN
 
     do j=1,kmlat
-      do i=1,kmlon
+      do i=1,kmlonp1
         eldyn % geomag_hall_conductivity(i,j) = zigm2(i,j)
         eldyn % geomag_pedersen_conductivity(i,j) = sqrt(zigm11(i,j)*zigm22(i,j))
       enddo
+
+      ! Check periodicity
+      if (eldyn % geomag_hall_conductivity(1,j) /= eldyn % geomag_hall_conductivity(kmlonp1,j)) then
+         print*, '***** Issue with periodicity for Hall conductivity *****'
+         print*, 'Value at (', 1, j, ') = ', eldyn % geomag_hall_conductivity(1,j)
+         print*, 'Value at (', kmlonp1, j, ') = ', eldyn % geomag_hall_conductivity(kmlonp1,j)
+      end if
+      if (eldyn % geomag_pedersen_conductivity(1,j) /= eldyn % geomag_pedersen_conductivity(kmlonp1,j)) then
+         print*, '***** Issue with periodicity for Pedersen conductivity *****'
+         print*, 'Value at (', 1, j, ') = ', eldyn % geomag_pedersen_conductivity(1,j)
+         print*, 'Value at (', kmlonp1, j, ') = ', eldyn % geomag_pedersen_conductivity(kmlonp1,j)
+      end if
     enddo
 
 ! // TODO // !
