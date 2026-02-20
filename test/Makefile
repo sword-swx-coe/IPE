@@ -65,7 +65,7 @@ test_rundir:
 	  ln -s ../data/ionprof .; \
 	  ln -s ../data/tiros_spectra .; \
 	  ln -s ../data/IPE_Grid.nc .; \
-	  ln -s ../data/IPE_State.apex.201303160000_AFTER.v3_fixed.nc IPE_State.apex.201303160000.nc; \
+	  ln -s ../data/IPE_State.apex.201303160000.nc .; \
 	  ln -s ../data/global_idea_coeff_W05* .; \
 	fi
 
