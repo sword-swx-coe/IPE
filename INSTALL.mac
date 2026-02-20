@@ -15,7 +15,7 @@ mpicxx -show
 
 # Install parallel netcdf with GNU C
 port install pnetcdf +gcc
-# Make python 3.11 the default
+# Make python 3.11 (or newer) the default
 port select --set python python311
 port select --set python3 python311
 # We need to make everything work with python311:
@@ -36,7 +36,7 @@ pip install netCDF4
 cd
 gitclone COMIO COMIOSRCDIR
 cd COMIOSRCDIR
-./configure --with-pnetcdf
+./configure --with-pnetcdf --without-hdf5
 make
 sudo make install # this installs into /usr/local/lib/libcomio.a
 
@@ -52,7 +52,7 @@ setenv ESMF_CXXCOMPILEOPTS -Wno-deprecated-declarations
 setenv ESMF_INSTALL_PREFIX /Users/gtoth/ESMF86gfortran
 # set C standard, default 99 cannot compile OSX system source files (clang::...)
 setenv ESMF_CSTD 2x
-# g++-mp-13 does not compile ESMF, switch to g++-mp-12 (port install gcc12)
+# g++-mp-13 does not compile ESMF (gcc14 may be fine). If necessary switch compiler:
 setenv MPICH_CXX /opt/local/bin/g++-mp-12
 
 make
@@ -67,22 +67,20 @@ setenv ESMFMKFILE ESMFINSTALLDIR/esmf.mk
 # Install IPE
 gitclone IPE IPESRCDIR
 cd IPESRCDIR
-# switch back to g++13
+# switch back to g++13 (or newer) if needed
 setenv MPICH_CXX /opt/local/bin/g++-mp-13
 # configure IPE to produce an executable
-./configure --prefix=$(pwd)/install
+./configure --prefix=`pwd`/install
 make -j
 make install
-cd IPEINSTALLDIR
-# Try running IPE executable
-bin/ipe.x
+# Try running IPE executable (it should stop with IPE.inp not found):
+install/bin/ipe.x
 IPE000: ERROR - IPE_Model_Parameters_Class.F90:265    Input file IPE.inp not found
 
 ## run test
 cd test
-# get fix and regression data
-./get_data.sh
+# get data from diskfarm if not already there
+rsync -a solsticedisk:/data/Simulations/gtoth/IPE/data .
 # run test
-./jobcard.local
-
-# This is currently considered correct. To be improved.
+make test
+# See if the errors are small (1e-4 is considered OK).
