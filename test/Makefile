@@ -20,7 +20,8 @@ help:
 	@echo "make -j test_compile  - (re)compile ipe.x"
 	@echo "make test_rundir      - create run directory 'run/'"
 	@echo "make test_run NP=3    - cd run; mpiexec -n 3 ipe.x"
-	@echo "make test_check       - check test results"
+	@echo "make test_check       - check test results against sums"
+	@echo "make test_check_all   - check test results for all cells"
 	@echo "make check_restartfile - verify restart file integrity"
 	@echo "make clean            - remove files created by test"
 
@@ -66,6 +67,7 @@ test_rundir:
 	  ln -s ../data/tiros_spectra .; \
 	  ln -s ../data/IPE_Grid.nc .; \
 	  ln -s ../data/IPE_State.apex.201303160000.nc .; \
+	  ln -s ../data/IPE_State.apex.201303160005_ref.nc .; \
 	  ln -s ../data/global_idea_coeff_W05* .; \
 	fi
 
@@ -73,6 +75,7 @@ test_rundir:
 #	cd run; ln -s ../data/* .
 
 TESTFILE = IPE_State.apex.201303160005.nc
+REFFILE  = IPE_State.apex.201303160005_ref.nc
 
 test_run:
 	rm -f run/$(TESTFILE)
@@ -83,6 +86,11 @@ test_check:
 	scripts/compare_sums.py run/$(TESTFILE) reference.txt \
 	> test.diff
 	@cat test.diff
+
+test_check_all: check_restartfile
+	scripts/compare.py run/$(TESTFILE) run/$(REFFILE) \
+	> test_all.diff
+	@cat test_all.diff
 
 clean:
 	rm -rf run test.diff
