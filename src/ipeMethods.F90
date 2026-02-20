@@ -1355,7 +1355,7 @@ contains
     IPEIsStateConnected = .false.
 
     ! determine how many fields are connected
-    nullify(connectedList)
+    nullify(connectedList, itemNameList)
     call NUOPC_GetStateMemberLists(state, ConnectedList=connectedList, &
       itemNameList=itemNameList, nestedFlag=.true., rc=localrc)
     if (ESMF_LogFoundError(rcToCheck=localrc, msg=ESMF_LOGERR_PASSTHRU, &
