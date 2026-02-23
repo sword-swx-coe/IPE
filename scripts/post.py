@@ -4,12 +4,13 @@ from multiprocessing import Pool
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 import glob
 from os import path
+from datetime import datetime
 
 class Grid:
   def __init__(self, path):
     # nlp, nmp, nfluxtube, nlon_geo, nlat_geo, nheights_geo
     # flux_tube_max(lp), facfac_interface, ii[1-4]_interface, dd_interface
-    g = Dataset(path).groups['apex_grid']
+    g = Dataset(path)
 
     self.nlp          = len(g.dimensions['phony_dim_0'])
     self.nfluxtube    = len(g.dimensions['phony_dim_1'])
@@ -88,13 +89,13 @@ class Grid:
 
       geo_data += ((apex_data[mp,lp2,iFlux2] - apex_data[mp,lp1,iFlux1])*factor[i] + apex_data[mp,lp1,iFlux1]) * self.dd_interface[i]
 
-    return np.swapaxes(geo_data / self.dtot_inv,0,2)
+    return geo_data / self.dtot_inv
 
 class Plasma:
   def __init__(self, filename, nlp, nmp, nfluxtube):
     self.ion_densities = np.zeros( (9, nmp, nlp, nfluxtube) )
 
-    f = Dataset(filename).groups['apex']
+    f = Dataset(filename)
 
     self.ion_densities[0] = f.variables['o_plus_density'][:]
     self.ion_densities[1] = f.variables['h_plus_density'][:]
@@ -114,7 +115,7 @@ class Neutral:
     self.velocity_apex = np.zeros( (3, nmp, nlp, nfluxtube) )
     self.velocity_geo  = np.zeros( (3, nmp, nlp, nfluxtube) )
 
-    f = Dataset(filename).groups['apex']
+    f = Dataset(filename)
 
     self.oxygen              = f.variables['o_density'][:]
     self.hydrogen            = f.variables['h_density'][:]
@@ -141,182 +142,195 @@ class IPE:
     self.plasma  = Plasma(h5_filename,  self.grid.nlp, self.grid.nmp, self.grid.nfluxtube)
     self.neutral = Neutral(h5_filename, self.grid.nlp, self.grid.nmp, self.grid.nfluxtube)
 
-  def write_netcdf(self, netcdf_filename):
+  def write_netcdf(self, netcdf_filename, time_str):
     # Open
-    o = Dataset(netcdf_filename, 'w', format='NETCDF4_CLASSIC')
-    # Dimensions
-    z_dim = o.createDimension('altitude',  self.grid.nheights_geo)
+    with Dataset(netcdf_filename, 'w') as o:
+      # Attrs
+      o.model_name = "IPE"
 
-    y_dim = o.createDimension('latitude',  self.grid.nlat_geo)
+      # Dimensions
+      z_dim = o.createDimension('z',  self.grid.nheights_geo)
 
-    x_dim = o.createDimension('longitude', self.grid.nlon_geo)
+      y_dim = o.createDimension('lat',  self.grid.nlat_geo)
 
-    z_var = o.createVariable('altitude',  'f4', 'altitude')
-    z_var.long_name = 'Altitude'
-    z_var.units     = 'km'
+        x_dim = o.createDimension('lon', self.grid.nlon_geo)
 
-    y_var = o.createVariable('latitude',  'f4', 'latitude')
-    y_var.long_name = 'Latitude'
-    y_var.units     = 'degrees_north'
+      time_dim = o.createDimension('time', None)
+      time_out = o.createVariable('time', np.float64, ('time',))
+      time_out.units = 's'
+      time_out.long_name = 'Seconds Since Jan 1, 1965 00 UT'
+      t = datetime.strptime(time_str, '%Y%m%d%H%M')
+      dt_sec = (t - datetime(1965,1,1)).total_seconds()
+      time_out[0] = dt_sec
 
-    x_var = o.createVariable('longitude', 'f4', 'longitude')
-    x_var.long_name = 'Longitude'
-    x_var.units     = 'degrees_east'
+      z_var = o.createVariable('z',  'f4', 'z')
+      z_var.long_name = 'Altitude'
+      z_var.units     = 'km'
 
-    # Variables
-    op_var   = o.createVariable('o_plus',               'f4', ('altitude','latitude','longitude',))
-    op_var.long_name = "O+ number density"
-    op_var.units     = "m^{-3}"
+      y_var = o.createVariable('lat',  'f4', 'lat')
+      y_var.long_name = 'Latitude'
+      y_var.units     = 'degrees_north'
 
-    hp_var   = o.createVariable('h_plus',               'f4', ('altitude','latitude','longitude',))
-    hp_var.long_name = "H+ number density"
-    hp_var.units     = "m^{-3}"
+      x_var = o.createVariable('lon', 'f4', 'lon')
+      x_var.long_name = 'Longitude'
+      x_var.units     = 'degrees_east'
 
-    hep_var  = o.createVariable('he_plus',              'f4', ('altitude','latitude','longitude',))
-    hep_var.long_name = "He+ number density"
-    hep_var.units     = "m^{-3}"
+      # Variables
+      op_var   = o.createVariable('o_plus',               'f4', ('lon','lat','z'))
+      op_var.long_name = "O+ number density"
+      op_var.units     = "m^{-3}"
 
-    np_var   = o.createVariable('n_plus',               'f4', ('altitude','latitude','longitude',))
-    np_var.long_name = "N+ number density"
-    np_var.units     = "m^{-3}"
+      hp_var   = o.createVariable('h_plus',               'f4', ('lon','lat','z'))
+      hp_var.long_name = "H+ number density"
+      hp_var.units     = "m^{-3}"
 
-    nop_var  = o.createVariable('no_plus',              'f4', ('altitude','latitude','longitude',))
-    nop_var.long_name = "NO+ number density"
-    nop_var.units     = "m^{-3}"
+      hep_var  = o.createVariable('he_plus',              'f4', ('lon','lat','z'))
+      hep_var.long_name = "He+ number density"
+      hep_var.units     = "m^{-3}"
 
-    o2p_var  = o.createVariable('o2_plus',              'f4', ('altitude','latitude','longitude',))
-    o2p_var.long_name = "O2+ number density"
-    o2p_var.units     = "m^{-3}"
+      np_var   = o.createVariable('n_plus',               'f4', ('lon','lat','z'))
+      np_var.long_name = "N+ number density"
+      np_var.units     = "m^{-3}"
 
-    n2p_var  = o.createVariable('n2_plus',              'f4', ('altitude','latitude','longitude',))
-    n2p_var.long_name = "N2+ number density"
-    n2p_var.units     = "m^{-3}"
+      nop_var  = o.createVariable('no_plus',              'f4', ('lon','lat','z'))
+      nop_var.long_name = "NO+ number density"
+      nop_var.units     = "m^{-3}"
 
-    op2d_var = o.createVariable('o_plus_2d',            'f4', ('altitude','latitude','longitude',))
-    op2d_var.long_name = "O+(2D) number density"
-    op2d_var.units     = "m^{-3}"
+      o2p_var  = o.createVariable('o2_plus',              'f4', ('lon','lat','z'))
+      o2p_var.long_name = "O2+ number density"
+      o2p_var.units     = "m^{-3}"
 
-    op2p_var = o.createVariable('o_plus_2p',            'f4', ('altitude','latitude','longitude',))
-    op2p_var.long_name = "O+(2P) number density"
-    op2p_var.units     = "m^{-3}"
+      n2p_var  = o.createVariable('n2_plus',              'f4', ('lon','lat','z'))
+      n2p_var.long_name = "N2+ number density"
+      n2p_var.units     = "m^{-3}"
 
-    tec_var = o.createVariable('TEC',                   'f4', ('latitude','longitude',))
-    tec_var.long_name = "Total Electron Content"
-    tec_var.units     = "TECu"
+      op2d_var = o.createVariable('o_plus_2d',            'f4', ('lon','lat','z'))
+      op2d_var.long_name = "O+(2D) number density"
+      op2d_var.units     = "m^{-3}"
 
-    he_var   = o.createVariable('helium',               'f4', ('altitude','latitude','longitude',))
-    he_var.long_name = "Neutral He density"
-    he_var.units     = "kg m^{-3}"
+      op2p_var = o.createVariable('o_plus_2p',            'f4', ('lon','lat','z'))
+      op2p_var.long_name = "O+(2P) number density"
+      op2p_var.units     = "m^{-3}"
 
-    o_var    = o.createVariable('oxygen',               'f4', ('altitude','latitude','longitude',))
-    o_var.long_name = "Neutral O density"
-    o_var.units     = "kg m^{-3}"
+      he_var   = o.createVariable('helium',               'f4', ('lon','lat','z'))
+      he_var.long_name = "Neutral He density"
+      he_var.units     = "kg m^{-3}"
 
-    o2_var   = o.createVariable('molecular_oxygen',     'f4', ('altitude','latitude','longitude',))
-    o2_var.long_name = "Neutral O2 density"
-    o2_var.units     = "kg m^{-3}"
+      o_var    = o.createVariable('oxygen',               'f4', ('lon','lat','z'))
+      o_var.long_name = "Neutral O density"
+      o_var.units     = "kg m^{-3}"
 
-    n2_var   = o.createVariable('molecular_nitrogen',   'f4', ('altitude','latitude','longitude',))
-    n2_var.long_name = "Neutral N2 density"
-    n2_var.units     = "kg m^{-3}"
+      o2_var   = o.createVariable('molecular_oxygen',     'f4', ('lon','lat','z'))
+      o2_var.long_name = "Neutral O2 density"
+      o2_var.units     = "kg m^{-3}"
 
-    n_var    = o.createVariable('nitrogen',             'f4', ('altitude','latitude','longitude',))
-    n_var.long_name = "Neutral N density"
-    n_var.units     = "kg m^{-3}"
+      n2_var   = o.createVariable('molecular_nitrogen',   'f4', ('lon','lat','z'))
+      n2_var.long_name = "Neutral N2 density"
+      n2_var.units     = "kg m^{-3}"
 
-    h_var    = o.createVariable('hydrogen',             'f4', ('altitude','latitude','longitude',))
-    h_var.long_name = "Neutral H density"
-    h_var.units     = "kg m^{-3}"
+      n_var    = o.createVariable('nitrogen',             'f4', ('lon','lat','z'))
+      n_var.long_name = "Neutral N density"
+      n_var.units     = "kg m^{-3}"
 
-    t_var    = o.createVariable('temperature',          'f4', ('altitude','latitude','longitude',))
-    t_var.long_name = "Neutral temperature"
-    t_var.units     = "K"
+      h_var    = o.createVariable('hydrogen',             'f4', ('lon','lat','z'))
+      h_var.long_name = "Neutral H density"
+      h_var.units     = "kg m^{-3}"
 
-    ua_var    = o.createVariable('u_apex',               'f4', ('altitude','latitude','longitude',))
-    ua_var.long_name = "Apex1 Velocity"
-    ua_var.units     = "m s^{-1}"
+      t_var    = o.createVariable('temperature',          'f4', ('lon','lat','z'))
+      t_var.long_name = "Neutral temperature"
+      t_var.units     = "K"
 
-    va_var    = o.createVariable('v_apex',               'f4', ('altitude','latitude','longitude',))
-    va_var.long_name = "Apex2 Velocity"
-    va_var.units     = "m s^{-1}"
+      ua_var    = o.createVariable('u_apex',               'f4', ('lon','lat','z'))
+      ua_var.long_name = "Apex1 Velocity"
+      ua_var.units     = "m s^{-1}"
 
-    wa_var    = o.createVariable('w_apex',               'f4', ('altitude','latitude','longitude',))
-    wa_var.long_name = "Apex3 Velocity"
-    wa_var.units     = "m s^{-1}"
+      va_var    = o.createVariable('v_apex',               'f4', ('lon','lat','z'))
+      va_var.long_name = "Apex2 Velocity"
+      va_var.units     = "m s^{-1}"
 
-    ug_var    = o.createVariable('u_geo',                'f4', ('altitude','latitude','longitude',))
-    ug_var.long_name = "Geographic Velocity1"
-    ug_var.units     = "m s^{-1}"
+      wa_var    = o.createVariable('w_apex',               'f4', ('lon','lat','z'))
+      wa_var.long_name = "Apex3 Velocity"
+      wa_var.units     = "m s^{-1}"
 
-    vg_var    = o.createVariable('v_geo',                'f4', ('altitude','latitude','longitude',))
-    vg_var.long_name = "Geographic Velocity2"
-    vg_var.units     = "m s^{-1}"
+      ug_var    = o.createVariable('u_geo',                'f4', ('lon','lat','z'))
+      ug_var.long_name = "Geographic Velocity1"
+      ug_var.units     = "m s^{-1}"
 
-    wg_var    = o.createVariable('w_geo',                'f4', ('altitude','latitude','longitude',))
-    wg_var.long_name = "Geographic Velocity3"
-    wg_var.units     = "m s^{-1}"
+      vg_var    = o.createVariable('v_geo',                'f4', ('lon','lat','z'))
+      vg_var.long_name = "Geographic Velocity2"
+      vg_var.units     = "m s^{-1}"
 
-    it_var   = o.createVariable('ion_temperature',      'f4', ('altitude','latitude','longitude',))
-    it_var.long_name = "Ion temperature"
-    it_var.units     = "K"
+      wg_var    = o.createVariable('w_geo',                'f4', ('lon','lat','z'))
+      wg_var.long_name = "Geographic Velocity3"
+      wg_var.units     = "m s^{-1}"
 
-    et_var   = o.createVariable('electron_temperature', 'f4', ('altitude','latitude','longitude',))
-    et_var.long_name = "Electron temperature"
-    et_var.units     = "K"
+      it_var   = o.createVariable('ion_temperature',      'f4', ('lon','lat','z'))
+      it_var.long_name = "Ion temperature"
+      it_var.units     = "K"
 
-    z_var[:] = self.grid.altitude_geo
-    y_var[:] = self.grid.latitude_geo
-    x_var[:] = self.grid.longitude_geo
+      et_var   = o.createVariable('electron_temperature', 'f4', ('lon','lat','z'))
+      et_var.long_name = "Electron temperature"
+      et_var.units     = "K"
 
-    op_var[:]   = self.grid.interpolate_to_geogrid(self.plasma.ion_densities[0])
-    hp_var[:]   = self.grid.interpolate_to_geogrid(self.plasma.ion_densities[1])
-    hep_var[:]  = self.grid.interpolate_to_geogrid(self.plasma.ion_densities[2])
-    np_var[:]   = self.grid.interpolate_to_geogrid(self.plasma.ion_densities[3])
-    nop_var[:]  = self.grid.interpolate_to_geogrid(self.plasma.ion_densities[4])
-    o2p_var[:]  = self.grid.interpolate_to_geogrid(self.plasma.ion_densities[5])
-    n2p_var[:]  = self.grid.interpolate_to_geogrid(self.plasma.ion_densities[6])
-    op2d_var[:] = self.grid.interpolate_to_geogrid(self.plasma.ion_densities[7])
-    op2p_var[:] = self.grid.interpolate_to_geogrid(self.plasma.ion_densities[8])
-    tec_var[:]  = np.sum(self.grid.interpolate_to_geogrid(self.plasma.tec),axis=0)*5000*1.0e-16
-    he_var[:]   = self.grid.interpolate_to_geogrid(self.neutral.helium)
-    o_var[:]    = self.grid.interpolate_to_geogrid(self.neutral.oxygen)
-    o2_var[:]   = self.grid.interpolate_to_geogrid(self.neutral.molecular_oxygen)
-    n2_var[:]   = self.grid.interpolate_to_geogrid(self.neutral.molecular_nitrogen)
-    n_var[:]    = self.grid.interpolate_to_geogrid(self.neutral.nitrogen)
-    h_var[:]    = self.grid.interpolate_to_geogrid(self.neutral.hydrogen)
-    t_var[:]    = self.grid.interpolate_to_geogrid(self.neutral.neutral_temperature)
-    ua_var[:]   = self.grid.interpolate_to_geogrid(self.neutral.velocity_apex[0])
-    va_var[:]   = self.grid.interpolate_to_geogrid(self.neutral.velocity_apex[1])
-    wa_var[:]   = self.grid.interpolate_to_geogrid(self.neutral.velocity_apex[2])
-    try:
-       ug_var[:]   = self.grid.interpolate_to_geogrid(self.neutral.velocity_geo[0])
-       vg_var[:]   = self.grid.interpolate_to_geogrid(self.neutral.velocity_geo[1])
-       wg_var[:]   = self.grid.interpolate_to_geogrid(self.neutral.velocity_geo[2])
-    except:
-       pass
-    it_var[:]   = self.grid.interpolate_to_geogrid(self.plasma.ion_temperature)
-    et_var[:]   = self.grid.interpolate_to_geogrid(self.plasma.electron_temperature)
+      z_var[:] = self.grid.altitude_geo
+      y_var[:] = self.grid.latitude_geo
+      x_var[:] = self.grid.longitude_geo
 
-    o.close()
+      op_var[:]   = self.grid.interpolate_to_geogrid(self.plasma.ion_densities[0])
+      hp_var[:]   = self.grid.interpolate_to_geogrid(self.plasma.ion_densities[1])
+      hep_var[:]  = self.grid.interpolate_to_geogrid(self.plasma.ion_densities[2])
+      np_var[:]   = self.grid.interpolate_to_geogrid(self.plasma.ion_densities[3])
+      nop_var[:]  = self.grid.interpolate_to_geogrid(self.plasma.ion_densities[4])
+      o2p_var[:]  = self.grid.interpolate_to_geogrid(self.plasma.ion_densities[5])
+      n2p_var[:]  = self.grid.interpolate_to_geogrid(self.plasma.ion_densities[6])
+      op2d_var[:] = self.grid.interpolate_to_geogrid(self.plasma.ion_densities[7])
+      op2p_var[:] = self.grid.interpolate_to_geogrid(self.plasma.ion_densities[8])
+      he_var[:]   = self.grid.interpolate_to_geogrid(self.neutral.helium)
+      o_var[:]    = self.grid.interpolate_to_geogrid(self.neutral.oxygen)
+      o2_var[:]   = self.grid.interpolate_to_geogrid(self.neutral.molecular_oxygen)
+      n2_var[:]   = self.grid.interpolate_to_geogrid(self.neutral.molecular_nitrogen)
+      n_var[:]    = self.grid.interpolate_to_geogrid(self.neutral.nitrogen)
+      h_var[:]    = self.grid.interpolate_to_geogrid(self.neutral.hydrogen)
+      t_var[:]    = self.grid.interpolate_to_geogrid(self.neutral.neutral_temperature)
+      ua_var[:]   = self.grid.interpolate_to_geogrid(self.neutral.velocity_apex[0])
+      va_var[:]   = self.grid.interpolate_to_geogrid(self.neutral.velocity_apex[1])
+      wa_var[:]   = self.grid.interpolate_to_geogrid(self.neutral.velocity_apex[2])
+      try:
+        ug_var[:]   = self.grid.interpolate_to_geogrid(self.neutral.velocity_geo[0])
+        vg_var[:]   = self.grid.interpolate_to_geogrid(self.neutral.velocity_geo[1])
+        wg_var[:]   = self.grid.interpolate_to_geogrid(self.neutral.velocity_geo[2])
+      except:
+        pass
+      it_var[:]   = self.grid.interpolate_to_geogrid(self.plasma.ion_temperature)
+      et_var[:]   = self.grid.interpolate_to_geogrid(self.plasma.electron_temperature)
+
+    return
 
 def load_and_write(i):
-  print files[i]
+  print(files[i])
   timestamp = files[i][-15:-3]
-  print timestamp
   ipe.read_h5(files[i])
-  ipe.write_netcdf(path.join(args.outdir,"IPE_Params.geo.{}.nc4".format(timestamp)))
+  ipe.write_netcdf(path.join(args.outdir,"IPE_Params.geo.{}.nc".format(timestamp)), 
+                   timestamp)
+
 
 ## input parsing options
-parser = ArgumentParser(description='Diff two NetCDF files as defined in this script', formatter_class=ArgumentDefaultsHelpFormatter)
-parser.add_argument('-g', '--gridfile', help='path to IPE_Grid.h5',      type=str, required=True)
-parser.add_argument('-i', '--indir',    help='path to input directory',  type=str, default=".")
+parser = ArgumentParser(description='Interpolate IPE Outputs to a geographic grid',
+                        formatter_class=ArgumentDefaultsHelpFormatter)
+parser.add_argument('-g', '--gridfile', help='path to IPE_Grid.nc',      type=str, required=True)
+parser.add_argument('-i', '--indir',    help='path to input directory',  type=str, default="./")
 parser.add_argument('-o', '--outdir',   help='path to output directory', type=str, default="output")
+parser.add_argument('-n', '--nprocs',   help='Number of processors to use. Default=1', type=int, default=1)
 args = parser.parse_args()
 
-MAX_PROCS = 4
 
 ipe = IPE(args.gridfile)
-files = glob.glob(path.join(args.indir,"IPE_State.apex.*.h5"))
-p = Pool(min([len(files),MAX_PROCS]))
-p.map(load_and_write,range(len(files)))
-#load_and_write(0)
+files = glob.glob(path.join(args.indir,"IPE_State.apex.*"))
+
+
+if args.nprocs > 1:
+  p = Pool(min([len(files),args.nprocs]))
+  p.map(load_and_write,range(len(files)))
+else:
+  for iFile in range(len(files)):
+    load_and_write(iFile)

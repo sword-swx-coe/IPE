@@ -151,9 +151,9 @@ class IPE:
     o.close()
 
 def load_and_write(i):
-  print files[i]
+  print(files[i])
   timestamp = files[i][-15:-3]
-  print timestamp
+  print(timestamp)
   ipe.read_h5(files[i])
   ipe.write_netcdf(path.join(args.outdir,"IPE_Ne.geo.{}.nc4".format(timestamp)))
 
