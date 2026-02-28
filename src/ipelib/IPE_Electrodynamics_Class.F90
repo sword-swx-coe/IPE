@@ -768,6 +768,7 @@ CONTAINS
 
     eldyn_conductivities(:,:,:,:)=0.
     ed_conductivities(:,:,:)=0.
+    tube_need(:) = 0
     CALL init_cons
 
     sangle= forcing % solarwind_angle ( forcing % current_index )
