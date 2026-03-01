@@ -1373,7 +1373,7 @@
 !                [sqrt(l(l+1)) sin(theta)]                              
 !      bp(l+1,m+1)= m p(l,m) /[sqrt(l(l+1)) sin(theta)]                 
 !       result for given l,m saved in bt and bp at one higher index num 
-      dimension bt(lmax,1),bp(lmax,1),plg(20,20) 
+      dimension bt(lmax,*),bp(lmax,*),plg(20,20) 
       save 
       data dgtr/1.74533e-2/ 
       if(m.gt.l.or.l.gt.lmax-1) then 
@@ -1414,7 +1414,7 @@
       subroutine legpl1(c,s,l,m,plg,lmax) 
 !      calculate legendre polynomials plg(l+1,m+1) through order l,m    
 !      for cosine c and sine s of colatitude                            
-      dimension plg(lmax,1) 
+      dimension plg(lmax,*) 
       save 
       data dgtr/1.74533e-2/ 
       if(m.gt.l.or.l.gt.lmax-1) then 

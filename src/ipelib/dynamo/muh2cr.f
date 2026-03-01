@@ -60,7 +60,7 @@ c
       equivalence(intl,iprm)
       equivalence(xa,fprm)
       integer i,j,ierror
-      real PE(NNX,1)
+      real PE(NNX,*)
       integer maxcya
 c      DATA MAXCYA/20/
       DATA MAXCYA/1/
