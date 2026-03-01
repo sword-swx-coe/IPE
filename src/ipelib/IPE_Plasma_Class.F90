@@ -813,11 +813,19 @@ CONTAINS
 
           i_convection_too_far_in_lp = .FALSE.
 
-          phi_t0   = grid % magnetic_longitude(mp) - v_ExB(1,lp,mp)*time_step/(r*sin( colat_90km(lp) ) )
+          if (abs(sin( colat_90km(lp) )) > 1.0e-15_prec) then
+             phi_t0   = grid % magnetic_longitude(mp) - v_ExB(1,lp,mp)*time_step/(r*sin( colat_90km(lp) ) )
+          else
+             phi_t0 = grid % magnetic_longitude(mp)
+          endif
 
           coslam = cos( half_pi - grid % magnetic_colatitude(1,lp) )
           sinim  = 2.0_prec*sqrt( 1.0_prec - coslam*coslam )/sqrt( 4.0_prec - 3.0_prec*coslam*coslam )
-          theta_t0 = colat_90km(lp) - v_ExB(2,lp,mp)*time_step/(r*sinim)
+          if (abs(sinim) > 1.0e-15_prec) then
+             theta_t0 = colat_90km(lp) - v_ExB(2,lp,mp)*time_step/(r*sinim)
+          else
+             theta_t0 = colat_90km(lp)
+          endif
 
           ! If a Lagrangian trajectory crosses the equator, we clip the colatitude
           ! so that the point resides at the equator.
@@ -924,20 +932,25 @@ CONTAINS
             lp_t0(1) = lp_min-1
             lp_t0(2) = lp_min
           endif
-
+          
           IF( phi_t0 <= grid % magnetic_longitude(mp) .AND. phi_t0 >= grid % magnetic_longitude(mp-1) )THEN
             mp_min = mp
           ELSEIF( phi_t0 <= grid % magnetic_longitude(mp+1) .AND. phi_t0 >= grid % magnetic_longitude(mp) )THEN
             mp_min = mp+1
           ENDIF
-
+          
           mp_t0(1) = mp_min-1
           mp_t0(2) = mp_min
 
           phi_i(1) = grid % magnetic_longitude(mp_t0(1))
           phi_i(2) = grid % magnetic_longitude(mp_t0(2))
-          mp_comp_weight(1) =  ( phi_t0 - phi_i(2) )/( phi_i(1)-phi_i(2) )
-          mp_comp_weight(2) = -( phi_t0 - phi_i(1) )/( phi_i(1)-phi_i(2) )
+          if (abs(phi_i(1)-phi_i(2)) > 1.0e-15_prec) then
+             mp_comp_weight(1) =  ( phi_t0 - phi_i(2) )/( phi_i(1)-phi_i(2) )
+             mp_comp_weight(2) = -( phi_t0 - phi_i(1) )/( phi_i(1)-phi_i(2) )
+          else
+             mp_comp_weight(1) = 1.0_prec
+             mp_comp_weight(2) = 0.0_prec
+          endif
 
           IF( lp_min == 1 )THEN  ! lp_min == 1
 
@@ -952,15 +965,20 @@ CONTAINS
 
           ELSE ! lp_min =/= 1 ....
 
-              
+
               if(lp_t0(2).eq.0) then
                 lp_t0(1) = 1
                 lp_t0(2) = 2
                 write(6,*) 'GHGM LP_T0 ',mp,lp,v_ExB(1,lp,mp), v_ExB(2,lp,mp)
               endif
 
-            lp_comp_weight(1) =  ( theta_t0 - colat_90km(lp_t0(2)) )/( colat_90km(lp_t0(1))-colat_90km(lp_t0(2)) )
-            lp_comp_weight(2) = -( theta_t0 - colat_90km(lp_t0(1)) )/( colat_90km(lp_t0(1))-colat_90km(lp_t0(2)) )
+             if(lp_t0(2).eq.lp_t0(1)) then
+                lp_comp_weight(1) = 1.0_prec
+                lp_comp_weight(2) = 0.0_prec
+             else
+                lp_comp_weight(1) =  ( theta_t0 - colat_90km(lp_t0(2)) )/( colat_90km(lp_t0(1))-colat_90km(lp_t0(2)) )
+                lp_comp_weight(2) = -( theta_t0 - colat_90km(lp_t0(1)) )/( colat_90km(lp_t0(1))-colat_90km(lp_t0(2)) )
+             endif
 
             DO 300 i = 1, grid % flux_tube_max(lp)
 
@@ -990,8 +1008,13 @@ CONTAINS
                       q_int(1) = grid % q_factor(isouth, lp_t0(lpx), mp_t0(mpx))
                       q_int(2) = grid % q_factor(inorth, lp_t0(lpx), mp_t0(mpx))
 
-                      i_comp_weight(1) = ( q_value - q_int(2) )/( q_int(1) - q_int(2) )
-                      i_comp_weight(2) = -( q_value - q_int(1) )/( q_int(1) - q_int(2) )
+                      if (abs(q_int(1) - q_int(2)) > 1.0e-15_prec) then
+                         i_comp_weight(1) = ( q_value - q_int(2) )/( q_int(1) - q_int(2) )
+                         i_comp_weight(2) = -( q_value - q_int(1) )/( q_int(1) - q_int(2) )
+                      else
+                         i_comp_weight(1) = 1.0_prec
+                         i_comp_weight(2) = 0.0_prec
+                      endif
                       EXIT
 
                     ENDIF
