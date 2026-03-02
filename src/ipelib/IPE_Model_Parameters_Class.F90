@@ -319,7 +319,12 @@ CONTAINS
 
       ! prepare buffers
       ! -- strings
-      sbuf = (/ grid_file, initial_timestamp, f107_kp_file, mesh_write_file, file_prefix, file_extension /)
+      sbuf(1) = grid_file
+      sbuf(2) = initial_timestamp
+      sbuf(3) = f107_kp_file
+      sbuf(4) = mesh_write_file
+      sbuf(5) = file_prefix
+      sbuf(6) = file_extension
       ! -- integers
       ibuf(1:15) = (/ f107_kp_size, f107_kp_interval, f107_kp_skip_size, f107_kp_realtime_interval, &
                       f107_kp_data_size, f107_kp_read_in_start, mesh_fill, mesh_write, import_write, &
