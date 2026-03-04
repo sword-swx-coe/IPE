@@ -17,7 +17,8 @@ install/
 
 #test
 test/data
-test/run
+test/run*
 test/regression
 test/fcst.log
 test/test.diff
+test/test_all.diff

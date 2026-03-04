@@ -36,7 +36,6 @@ IMPLICIT NONE
     REAL(prec), ALLOCATABLE :: b_parallel_conductivity(:,:)
     REAL(prec), ALLOCATABLE :: neutral_apex_velocity(:,:,:) ! Components are apex directions
 
-
     ! Geographic interpolated attributes
     REAL(prec), ALLOCATABLE :: geo_electric_potential(:,:)
     REAL(prec), ALLOCATABLE :: geo_v_ExB_geographic(:,:,:)    ! ExB transport velocity with geographic components
@@ -44,6 +43,9 @@ IMPLICIT NONE
     REAL(prec), ALLOCATABLE :: geo_pedersen_conductivity(:,:)
     REAL(prec), ALLOCATABLE :: geo_b_parallel_conductivity(:,:)
 
+    ! Attributes on geomagnetic grid
+    REAL(prec), POINTER :: geomag_hall_conductivity(:,:)
+    REAL(prec), POINTER :: geomag_pedersen_conductivity(:,:)
 
     CONTAINS
 
@@ -146,6 +148,14 @@ CONTAINS
         END DO
       END IF
 
+      ALLOCATE( eldyn % geomag_hall_conductivity(kmlonp1,kmlat), &
+                eldyn % geomag_pedersen_conductivity(kmlonp1,kmlat), &
+                stat=stat )
+      IF ( ipe_alloc_check( stat, msg="Unable to allocate internal arrays", &
+        line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+
+      eldyn % geomag_hall_conductivity       = 0.0_prec
+      eldyn % geomag_pedersen_conductivity   = 0.0_prec
 
   END SUBROUTINE Build_IPE_Electrodynamics
 
@@ -758,6 +768,7 @@ CONTAINS
 
     eldyn_conductivities(:,:,:,:)=0.
     ed_conductivities(:,:,:)=0.
+    tube_need(:) = 0
     CALL init_cons
 
     sangle= forcing % solarwind_angle ( forcing % current_index )
@@ -882,13 +893,30 @@ CONTAINS
            ,(xlatm(j)*180./pi_dyn) &     
            ,zigm2(i,j) &
            ,( sqrt(zigm11(i,j)*zigm22(i,j)) )
-
         enddo mlon0
       enddo mlat0     
       print*,'*****(26)end output conductance'
       !print *,'*********************************'
     END IF !( mpi_layer % rank_id == 0 )THEN
-!
+
+    do j=1,kmlat
+      do i=1,kmlonp1
+        eldyn % geomag_hall_conductivity(i,j) = zigm2(i,j)
+        eldyn % geomag_pedersen_conductivity(i,j) = sqrt(zigm11(i,j)*zigm22(i,j))
+      enddo
+
+      ! Check periodicity
+      if (eldyn % geomag_hall_conductivity(1,j) /= eldyn % geomag_hall_conductivity(kmlonp1,j)) then
+         print*, '***** Issue with periodicity for Hall conductivity *****'
+         print*, 'Value at (', 1, j, ') = ', eldyn % geomag_hall_conductivity(1,j)
+         print*, 'Value at (', kmlonp1, j, ') = ', eldyn % geomag_hall_conductivity(kmlonp1,j)
+      end if
+      if (eldyn % geomag_pedersen_conductivity(1,j) /= eldyn % geomag_pedersen_conductivity(kmlonp1,j)) then
+         print*, '***** Issue with periodicity for Pedersen conductivity *****'
+         print*, 'Value at (', 1, j, ') = ', eldyn % geomag_pedersen_conductivity(1,j)
+         print*, 'Value at (', kmlonp1, j, ') = ', eldyn % geomag_pedersen_conductivity(kmlonp1,j)
+      end if
+    enddo
 
 ! // TODO // !
 ! HEY YOU ! PAY ATTENTION *!
@@ -928,11 +956,11 @@ CONTAINS
 
     CALL eldyn % Regrid_Potential( grid,mpi_layer, time_tracker,ed1dy_map,xlonm_deg_map,ylatm_deg_map, 1, 82,kmlat, rc=localrc )
     IF ( ipe_error_check( localrc, msg="call to Regrid_Potential (ed1dy_map) failed", line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
-    eldyn % electric_field(1,:,:) = eldyn % electric_potential
+    eldyn % electric_field(1,:,:) = eldyn % electric_potential(:,grid % mp_low:grid % mp_high)
 
     CALL eldyn % Regrid_Potential( grid,mpi_layer, time_tracker,ed2dy_map,xlonm_deg_map,ylatm_deg_map, 1, 82,kmlat, rc=localrc )
     IF ( ipe_error_check( localrc, msg="call to Regrid_Potential (ed2dy_map) failed", line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
-    eldyn % electric_field(2,:,:) = eldyn % electric_potential
+    eldyn % electric_field(2,:,:) = eldyn % electric_potential(:,grid % mp_low:grid % mp_high)
 
   END SUBROUTINE Dynamo_Wrapper
 

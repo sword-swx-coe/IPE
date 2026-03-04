@@ -66,7 +66,7 @@ c
       equivalence(intl,iprm)
       equivalence(xa,fprm)
       integer i,j,ierror
-      real PE(NNX,1)
+      real PE(NNX,*)
       integer maxcya
       DATA MAXCYA/50/
       integer mm,nn,jj,jjj

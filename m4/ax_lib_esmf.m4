@@ -135,11 +135,11 @@ if test "x$ax_lib_esmf_mk" != x ; then
   )
 
   dnl Set output variables for current language
-  ESMF_[]_AC_LANG_PREFIX[]=`$GREP ESMF_${ax_lib_esmf_compiler}COMPILER $ax_lib_esmf_mk | $SED 's/.*=//'`
-  ESMF_[]_AC_LANG_PREFIX[]FLAGS=`$GREP ESMF_${ax_lib_esmf_compiler}COMPILEPATHS $ax_lib_esmf_mk | $SED 's/.*=//'`
-  ESMF_LDFLAGS=`$GREP '^ESMF_${ax_lib_esmf_compiler}LINKPATHS' $ax_lib_esmf_mk | $SED 's/.*=//'`
-  ESMF_LIBS=`$GREP ESMF_${ax_lib_esmf_compiler}ESMFLINKLIBS $ax_lib_esmf_mk | $SED 's/.*=//'`
-  ESMF_VERSION=`$GREP ESMF_VERSION_STRING= $ax_lib_esmf_mk | $SED 's/.*=//'`
+  ESMF_[]_AC_LANG_PREFIX[]=`$GREP '^ESMF_'${ax_lib_esmf_compiler}'COMPILER' $ax_lib_esmf_mk | $SED 's/.*=//'`
+  ESMF_[]_AC_LANG_PREFIX[]FLAGS=`$GREP '^ESMF_'${ax_lib_esmf_compiler}'COMPILEPATHS' $ax_lib_esmf_mk | $SED 's/.*=//'`
+  ESMF_LDFLAGS=`$GREP '^ESMF_'${ax_lib_esmf_compiler}'LINKPATHS' $ax_lib_esmf_mk | $SED 's/.*=//'`
+  ESMF_LIBS=`$GREP '^ESMF_'${ax_lib_esmf_compiler}'ESMFLINKLIBS' $ax_lib_esmf_mk | $SED 's/.*=//'`
+  ESMF_VERSION=`$GREP '^ESMF_VERSION_STRING=' $ax_lib_esmf_mk | $SED 's/.*=//'`
 
   AC_SUBST(ESMF_[]_AC_LANG_PREFIX[])
   AC_SUBST(ESMF_[]_AC_LANG_PREFIX[]FLAGS)

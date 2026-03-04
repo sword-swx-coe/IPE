@@ -78,12 +78,12 @@
 ! -sign of K_(m lam)^D in southern hemisphere is reversed, therefore 
 !     K_(m lam)^N - (- K_(m lam)^S)
 !
-! zigm11 = Sigma_(phi phi)(0)^T
-! zigm22 = Sigma_(lam lam)(0)^T
-! zigmc  =-Sigma_c(0)^T 
-! zigm2  = Sigma_h(0)^T 
-! rim(1) = K_(m phi)^D(0)^T
-! rim(2) = K_(m lam)^D(0)^T
+! zigm11   = Sigma_(phi phi)(0)^T
+! zigm22   = Sigma_(lam lam)(0)^T
+! zigmc    =-Sigma_c(0)^T 
+! zigm2    = Sigma_h(0)^T 
+! rim(1)   = K_(m phi)^D(0)^T
+! rim(2)   = K_(m lam)^D(0)^T
 !
 
 
