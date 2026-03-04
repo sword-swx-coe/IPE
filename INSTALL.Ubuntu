@@ -1,0 +1,37 @@
+
+sudo apt install libnetcdf-pnetcdf-22 libnetcdf-pnetcdf-dev libpnetcdf-dev libpnetcdf6 pnetcdf-bin
+
+edit the crap out of the pnetcdf-config, since this seems to be wrong
+and have weird directories in it.
+
+
+git clone git@github.com:NOAA-SWPC/COMIO.git COMIO_src
+
+sudo apt install hdf5-tools
+sudo apt install libhdf5-mpi-dev
+
+export FCFLAGS=-I/usr/lib/x86_64-linux-gnu/fortran/gfortran-mod-15/
+cd COMIO_src
+./configure
+make
+sudo make install
+
+
+# Compile ESMF 
+cd
+git clone git@github.com:esmf-org/esmf.git ESMF_src
+cd ESMF_src
+export ESMF_DIR=`pwd`
+export ESMF_COMPILER=gfortran
+export ESMF_INSTALL_PREFIX=/home/ridley/Software/IPE/ESMF_src/Install
+# set C standard, default 99 cannot compile OSX system source files (clang::...)
+export ESMF_CSTD=2x
+
+make
+make install
+cd ESMFINSTALLDIR
+# make it easy to include the esmf.mk file
+ln -s lib/lib?/*/esmf.mk .
+export ESMFMKFILE=/home/ridley/Software/IPE/ESMF_src/Install/esmf.mk
+
+
