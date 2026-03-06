@@ -44,8 +44,8 @@ IMPLICIT NONE
     REAL(prec), ALLOCATABLE :: geo_b_parallel_conductivity(:,:)
 
     ! Attributes on geomagnetic grid
-    REAL(prec), POINTER :: geomag_hall_conductivity(:,:)
-    REAL(prec), POINTER :: geomag_pedersen_conductivity(:,:)
+    REAL(prec), ALLOCATABLE :: geomag_hall_conductivity(:,:)
+    REAL(prec), ALLOCATABLE :: geomag_pedersen_conductivity(:,:)
 
     CONTAINS
 
@@ -905,15 +905,17 @@ CONTAINS
       enddo
 
       ! Check periodicity
-      if (eldyn % geomag_hall_conductivity(1,j) /= eldyn % geomag_hall_conductivity(kmlonp1,j)) then
-         print*, '***** Issue with periodicity for Hall conductivity *****'
-         print*, 'Value at (', 1, j, ') = ', eldyn % geomag_hall_conductivity(1,j)
-         print*, 'Value at (', kmlonp1, j, ') = ', eldyn % geomag_hall_conductivity(kmlonp1,j)
-      end if
-      if (eldyn % geomag_pedersen_conductivity(1,j) /= eldyn % geomag_pedersen_conductivity(kmlonp1,j)) then
-         print*, '***** Issue with periodicity for Pedersen conductivity *****'
-         print*, 'Value at (', 1, j, ') = ', eldyn % geomag_pedersen_conductivity(1,j)
-         print*, 'Value at (', kmlonp1, j, ') = ', eldyn % geomag_pedersen_conductivity(kmlonp1,j)
+      if( mpi_layer % rank_id == 0 )then
+        if (eldyn % geomag_hall_conductivity(1,j) /= eldyn % geomag_hall_conductivity(kmlonp1,j)) then
+          print*, '***** Issue with periodicity for Hall conductivity *****'
+          print*, 'Value at (', 1, j, ') = ', eldyn % geomag_hall_conductivity(1,j)
+          print*, 'Value at (', kmlonp1, j, ') = ', eldyn % geomag_hall_conductivity(kmlonp1,j)
+        end if
+        if (eldyn % geomag_pedersen_conductivity(1,j) /= eldyn % geomag_pedersen_conductivity(kmlonp1,j)) then
+          print*, '***** Issue with periodicity for Pedersen conductivity *****'
+          print*, 'Value at (', 1, j, ') = ', eldyn % geomag_pedersen_conductivity(1,j)
+          print*, 'Value at (', kmlonp1, j, ') = ', eldyn % geomag_pedersen_conductivity(kmlonp1,j)
+        end if
       end if
     enddo
 
