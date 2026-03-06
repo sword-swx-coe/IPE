@@ -815,9 +815,6 @@ module ipeCap
           case ("upward_exb_velocity")
             modelPtr3d(kps:,lps:,mps:) => ipe % eldyn % v_exb_geographic(3,:,:,:)
           case ("hall_conductance")
-          !  modelPtr2d(1:kmlonp1,1:kmlat) => ipe % eldyn % geomag_hall_conductivity(:,:)
-          !case ("pedersen_conductance")
-          !  modelPtr2d(1:kmlonp1,1:kmlat) => ipe % eldyn % geomag_pedersen_conductivity(:,:)
             modelPtr2d(1:,1:) => ipe % eldyn % geomag_hall_conductivity
           case ("pedersen_conductance")
             modelPtr2d(1:,1:) => ipe % eldyn % geomag_pedersen_conductivity
