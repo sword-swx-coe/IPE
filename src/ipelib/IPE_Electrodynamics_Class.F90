@@ -44,8 +44,6 @@ IMPLICIT NONE
     REAL(prec), ALLOCATABLE :: geo_b_parallel_conductivity(:,:)
 
     ! Attributes on geomagnetic grid
-    !REAL(prec), ALLOCATABLE :: geomag_hall_conductivity(:,:)
-    !REAL(prec), ALLOCATABLE :: geomag_pedersen_conductivity(:,:)
     REAL(prec), POINTER :: geomag_hall_conductivity(:,:)
     REAL(prec), POINTER :: geomag_pedersen_conductivity(:,:)
 
