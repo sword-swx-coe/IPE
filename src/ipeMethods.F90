@@ -889,7 +889,7 @@ contains
           line=__LINE__, &
           file=__FILE__, &
           rcToReturn=rc)) return
-        write(6,'(" Checking tile on PET ",i0,":"2(" (",i0,":",i0,") x (",i0,":",i0,")"))') &
+        write(6,'(" Checking tile on PET ",i0,":",2(" (",i0,":",i0,") x (",i0,":",i0,")"))') &
           localPet, lps, lpe, mps, mpe, lps, lpu, mps, mpu
         nCount = count(abs(coord-BAD_VALUE) < 0.1_ESMF_KIND_R4)
         if (nCount > 0) then
@@ -1068,7 +1068,7 @@ contains
       line=__LINE__, &
       file=__FILE__, &
       rcToReturn=rc)) return
-    write(msg, fmt='(a,4i)') 'IPE Lon_I imin, imax = ', &
+    write(msg, fmt='(a,2i0)') 'IPE Lon_I imin, imax = ', &
       lbound(Lon_I, dim=1), ubound(Lon_I, dim=1)
     call ESMF_LogWrite(trim(msg), ESMF_LOGMSG_INFO)
 
@@ -1079,7 +1079,7 @@ contains
       line=__LINE__, &
       file=__FILE__, &
       rcToReturn=rc)) return
-    write(msg, fmt='(a,4i)') 'IPE Lat_I jmin, jmax = ', &
+    write(msg, fmt='(a,2i0)') 'IPE Lat_I jmin, jmax = ', &
       lbound(Lat_I, dim=1), ubound(Lat_I, dim=1)
     call ESMF_LogWrite(trim(msg), ESMF_LOGMSG_INFO)
 
@@ -1355,7 +1355,7 @@ contains
     IPEIsStateConnected = .false.
 
     ! determine how many fields are connected
-    nullify(connectedList)
+    nullify(connectedList, itemNameList)
     call NUOPC_GetStateMemberLists(state, ConnectedList=connectedList, &
       itemNameList=itemNameList, nestedFlag=.true., rc=localrc)
     if (ESMF_LogFoundError(rcToCheck=localrc, msg=ESMF_LOGERR_PASSTHRU, &

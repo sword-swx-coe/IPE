@@ -44,8 +44,10 @@ IMPLICIT NONE
     REAL(prec), ALLOCATABLE :: geo_b_parallel_conductivity(:,:)
 
     ! Attributes on geomagnetic grid
-    REAL(prec), ALLOCATABLE :: geomag_hall_conductivity(:,:)
-    REAL(prec), ALLOCATABLE :: geomag_pedersen_conductivity(:,:)
+    !REAL(prec), ALLOCATABLE :: geomag_hall_conductivity(:,:)
+    !REAL(prec), ALLOCATABLE :: geomag_pedersen_conductivity(:,:)
+    REAL(prec), POINTER :: geomag_hall_conductivity(:,:)
+    REAL(prec), POINTER :: geomag_pedersen_conductivity(:,:)
 
     CONTAINS
 
@@ -768,6 +770,7 @@ CONTAINS
 
     eldyn_conductivities(:,:,:,:)=0.
     ed_conductivities(:,:,:)=0.
+    tube_need(:) = 0
     CALL init_cons
 
     sangle= forcing % solarwind_angle ( forcing % current_index )
@@ -957,11 +960,11 @@ CONTAINS
 
     CALL eldyn % Regrid_Potential( grid,mpi_layer, time_tracker,ed1dy_map,xlonm_deg_map,ylatm_deg_map, 1, 82,kmlat, rc=localrc )
     IF ( ipe_error_check( localrc, msg="call to Regrid_Potential (ed1dy_map) failed", line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
-    eldyn % electric_field(1,:,:) = eldyn % electric_potential
+    eldyn % electric_field(1,:,:) = eldyn % electric_potential(:,grid % mp_low:grid % mp_high)
 
     CALL eldyn % Regrid_Potential( grid,mpi_layer, time_tracker,ed2dy_map,xlonm_deg_map,ylatm_deg_map, 1, 82,kmlat, rc=localrc )
     IF ( ipe_error_check( localrc, msg="call to Regrid_Potential (ed2dy_map) failed", line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
-    eldyn % electric_field(2,:,:) = eldyn % electric_potential
+    eldyn % electric_field(2,:,:) = eldyn % electric_potential(:,grid % mp_low:grid % mp_high)
 
   END SUBROUTINE Dynamo_Wrapper
 

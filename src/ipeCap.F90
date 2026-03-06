@@ -637,7 +637,7 @@ module ipeCap
         return  ! bail out
     end if
 
-    if (size(fieldList, dim=1) > 0) then
+    if (associated(fieldList) .and. size(fieldList, dim=1) > 0) then
 
       if (.not.associated(this % nodeToIndexMap)) then
         call ESMF_LogSetError(ESMF_RC_PTR_NOTALLOC, &
@@ -752,7 +752,7 @@ module ipeCap
       file=__FILE__)) &
       return  ! bail out
 
-    if (size(fieldList, dim=1) > 0) then
+    if (associated(fieldList) .and. size(fieldList, dim=1) > 0) then
 
       if (.not.associated(this % nodeToIndexMap)) then
         call ESMF_LogSetError(ESMF_RC_PTR_NOTALLOC, &
@@ -815,9 +815,12 @@ module ipeCap
           case ("upward_exb_velocity")
             modelPtr3d(kps:,lps:,mps:) => ipe % eldyn % v_exb_geographic(3,:,:,:)
           case ("hall_conductance")
-            modelPtr2d(1:kmlonp1,1:kmlat) => ipe % eldyn % geomag_hall_conductivity(:,:)
+          !  modelPtr2d(1:kmlonp1,1:kmlat) => ipe % eldyn % geomag_hall_conductivity(:,:)
+          !case ("pedersen_conductance")
+          !  modelPtr2d(1:kmlonp1,1:kmlat) => ipe % eldyn % geomag_pedersen_conductivity(:,:)
+            modelPtr2d(1:,1:) => ipe % eldyn % geomag_hall_conductivity
           case ("pedersen_conductance")
-            modelPtr2d(1:kmlonp1,1:kmlat) => ipe % eldyn % geomag_pedersen_conductivity(:,:)
+            modelPtr2d(1:,1:) => ipe % eldyn % geomag_pedersen_conductivity
           case default
             ! -- unavailable neutrals array, skip it
             cycle
@@ -881,6 +884,55 @@ module ipeCap
         end if
       end do
 
+          ! --- fill field data
+          do id = 1, numLocalNodes
+            kp = this % nodeToIndexMap(id, 1)
+            lp = this % nodeToIndexMap(id, 2)
+            mp = this % nodeToIndexMap(id, 3)
+            fieldPtr(id) = modelPtr3d(kp, lp, mp)
+          end do
+
+          ! -- write export fields
+          if (ipe % parameters % export_write > 0) then
+            call ESMF_FieldWriteVTK(fieldList(item), "ipe_export_"//trim(timeStr), rc=rc)
+            if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+              line=__LINE__,  &
+              file=__FILE__)) &
+              return  ! bail out
+          end if
+        end if
+
+        if (associated(modelPtr2d)) then
+          ! --- get field data
+          nullify(fieldPtr2d)
+          call ESMF_FieldGet(fieldList(item), farrayPtr=fieldPtr2d, rc=rc)
+          if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__,  &
+            file=__FILE__)) &
+            return  ! bail out
+
+          ! --- fill field data
+          istr = lbound(fieldPtr2d, dim=1)
+          iend = ubound(fieldPtr2d, dim=1)
+          jstr = lbound(fieldPtr2d, dim=2)
+          jend = ubound(fieldPtr2d, dim=2)
+          do j = jstr, jend
+            do i = istr, iend
+              fieldPtr2d(i,j) = modelPtr2d(i,j)
+            end do
+          end do
+
+          ! -- write export fields
+          if (ipe % parameters % export_write > 0) then
+            call ESMF_FieldWrite(fieldList(item), "ipe_export_"//trim(timeStr)//".nc", overwrite=.true., rc=rc)
+            if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+              line=__LINE__,  &
+              file=__FILE__)) &
+              return  ! bail out
+          end if
+        end if
+      end do
+      
     end if
 
     if (associated(fieldList)) then
