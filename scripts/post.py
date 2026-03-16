@@ -3,7 +3,7 @@ from netCDF4 import Dataset
 from multiprocessing import Pool
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 import glob
-from os import path
+from os import path, remove
 from datetime import datetime
 
 class Grid:
@@ -319,7 +319,8 @@ parser = ArgumentParser(description='Interpolate IPE Outputs to a geographic gri
                         formatter_class=ArgumentDefaultsHelpFormatter)
 parser.add_argument('-g', '--gridfile', help='path to IPE_Grid.nc',      type=str, required=True)
 parser.add_argument('-i', '--indir',    help='path to input directory',  type=str, default="./")
-parser.add_argument('-o', '--outdir',   help='path to output directory', type=str, default="output")
+parser.add_argument('-o', '--outdir',   help='path to output directory', type=str, default="./")
+parser.add_argument('-keep', help="Include this flag to not delete the raw outputs", action='store_true')
 parser.add_argument('-n', '--nprocs',   help='Number of processors to use. Default=1', type=int, default=1)
 args = parser.parse_args()
 
@@ -334,3 +335,8 @@ if args.nprocs > 1:
 else:
   for iFile in range(len(files)):
     load_and_write(iFile)
+
+# Remove files if we are not told to -keep them
+if not args.keep:
+  for eachFile in files:
+    remove(eachFile)
