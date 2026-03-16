@@ -9,7 +9,7 @@ class Grid:
   def __init__(self, path):
     # nlp, nmp, nfluxtube, nlon_geo, nlat_geo, nheights_geo
     # flux_tube_max(lp), facfac_interface, ii[1-4]_interface, dd_interface
-    g = Dataset(path).groups['apex_grid']
+    g = Dataset(path)
 
     self.nlp          = len(g.dimensions['phony_dim_0'])
     self.nfluxtube    = len(g.dimensions['phony_dim_1'])
@@ -87,7 +87,8 @@ class Grid:
       iFlux1 = self.ilp_map[0,in1].astype(np.int32)    # nlon, nlat, nheights
       lp1    = self.ilp_map[1,in1].astype(np.int32)    # nlon, nlat, nheights
 
-      geo_data += ((apex_data[mp,lp2,iFlux2] - apex_data[mp,lp1,iFlux1])*factor[i] + apex_data[mp,lp1,iFlux1]) * self.dd_interface[i]
+      geo_data += ((apex_data[mp,lp2,iFlux2] - apex_data[mp,lp1,iFlux1])*factor[i]
+                    + apex_data[mp,lp1,iFlux1]) * self.dd_interface[i]
 
     return np.swapaxes(geo_data / self.dtot_inv,0,2)
 
@@ -95,7 +96,7 @@ class Plasma:
   def __init__(self, filename, nlp, nmp, nfluxtube):
     self.ion_densities = np.zeros( (9, nmp, nlp, nfluxtube) )
 
-    f = Dataset(filename).groups['apex']
+    f = Dataset(filename)
 
     self.ion_densities[0] = f.variables['o_plus_density'][:]
     self.ion_densities[1] = f.variables['h_plus_density'][:]
@@ -106,7 +107,6 @@ class Plasma:
     self.ion_densities[6] = f.variables['n2_plus_density'][:]
     self.ion_densities[7] = f.variables['o_plus_2D_density'][:]
     self.ion_densities[8] = f.variables['o_plus_2P_density'][:]
-#   self.tec              = np.sum(self.ion_densities,axis=0)
     self.electron_density = (np.sum(self.ion_densities,axis=0)) /1.e12
 
 class IPE:
@@ -118,57 +118,60 @@ class IPE:
 
   def write_netcdf(self, netcdf_filename):
     # Open
-    o = Dataset(netcdf_filename, 'w', format='NETCDF4_CLASSIC')
-    # Dimensions
-    z_dim = o.createDimension('altitude',  self.grid.nheights_geo)
+    with Dataset(netcdf_filename, 'w') as o:
+      # Dimensions
+      z_dim = o.createDimension('altitude',  self.grid.nheights_geo)
 
-    y_dim = o.createDimension('latitude',  self.grid.nlat_geo)
+      y_dim = o.createDimension('latitude',  self.grid.nlat_geo)
 
-    x_dim = o.createDimension('longitude', self.grid.nlon_geo)
+      x_dim = o.createDimension('longitude', self.grid.nlon_geo)
 
-    z_var = o.createVariable('altitude',  'f4', 'altitude',zlib=True,least_significant_digit=3)
-    z_var.long_name = 'Altitude'
-    z_var.units     = 'km'
+      z_var = o.createVariable('altitude',  'f4', 'altitude',zlib=True,least_significant_digit=3)
+      z_var.long_name = 'Altitude'
+      z_var.units     = 'km'
 
-    y_var = o.createVariable('latitude',  'f4', 'latitude',zlib=True,least_significant_digit=3)
-    y_var.long_name = 'Latitude'
-    y_var.units     = 'degrees_north'
+      y_var = o.createVariable('latitude',  'f4', 'latitude',zlib=True,least_significant_digit=3)
+      y_var.long_name = 'Latitude'
+      y_var.units     = 'degrees_north'
 
-    x_var = o.createVariable('longitude', 'f4', 'longitude',zlib=True,least_significant_digit=3)
-    x_var.long_name = 'Longitude'
-    x_var.units     = 'degrees_east'
+      x_var = o.createVariable('longitude', 'f4', 'longitude',zlib=True,least_significant_digit=3)
+      x_var.long_name = 'Longitude'
+      x_var.units     = 'degrees_east'
 
-    ne_var = o.createVariable('electron_density',       'f4', ('altitude','latitude','longitude',),zlib=True ,least_significant_digit=4) #,complevel=9)
-    ne_var.long_name = "Electron Density"
-    ne_var.units     = "m^{-3}"
+      ne_var = o.createVariable('electron_density', 'f4', ('altitude','latitude','longitude',),
+                                zlib=True ,least_significant_digit=4) #,complevel=9)
+      ne_var.long_name = "Electron Density"
+      ne_var.units     = "m^{-3}"
 
-    z_var[:] = self.grid.altitude_geo
-    y_var[:] = self.grid.latitude_geo
-    x_var[:] = self.grid.longitude_geo
+      z_var[:] = self.grid.altitude_geo
+      y_var[:] = self.grid.latitude_geo
+      x_var[:] = self.grid.longitude_geo
 
-    ne_var[:]  = self.grid.interpolate_to_geogrid(self.plasma.electron_density)
+      ne_var[:]  = self.grid.interpolate_to_geogrid(self.plasma.electron_density)
 
-    o.close()
 
 def load_and_write(i):
   print(files[i])
   timestamp = files[i][-15:-3]
-  print(timestamp)
   ipe.read_h5(files[i])
-  ipe.write_netcdf(path.join(args.outdir,"IPE_Ne.geo.{}.nc4".format(timestamp)))
+  ipe.write_netcdf(path.join(args.outdir,"IPE_Ne.geo.{}.nc".format(timestamp)))
 
 ## input parsing options
-parser = ArgumentParser(description='Diff two NetCDF files as defined in this script', formatter_class=ArgumentDefaultsHelpFormatter)
+parser = ArgumentParser(description='Interpolate e- density only to a geographic grid',
+                        formatter_class=ArgumentDefaultsHelpFormatter)
 parser.add_argument('-g', '--gridfile', help='path to IPE_Grid.h5',      type=str, required=True)
 parser.add_argument('-i', '--indir',    help='path to input directory',  type=str, default=".")
-parser.add_argument('-o', '--outdir',   help='path to output directory', type=str, default="output")
+parser.add_argument('-o', '--outdir',   help='path to output directory', type=str, default=".")
+parser.add_argument('-n', '--numprocs',   help='Number of cores to use. Default=1', type=int, default=1)
 args = parser.parse_args()
 
-MAX_PROCS = 8
 
 ipe = IPE(args.gridfile)
-files = glob.glob(path.join(args.indir,"IPE_State.apex.*.h5"))
-p = Pool(min([len(files),MAX_PROCS]))
-p.map(load_and_write,range(len(files)))
-#load_and_write(0)
+files = glob.glob(path.join(args.indir,"IPE_State.apex.*"))
 
+if args.numprocs > 1:
+  p = Pool(min([len(files), args.numprocs]))
+  p.map(load_and_write,range(len(files)))
+else:
+  for iFile in range(len(files)):
+    load_and_write(iFile)
