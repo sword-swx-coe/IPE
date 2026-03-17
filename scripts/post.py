@@ -153,7 +153,7 @@ class IPE:
 
       y_dim = o.createDimension('lat',  self.grid.nlat_geo)
 
-        x_dim = o.createDimension('lon', self.grid.nlon_geo)
+      x_dim = o.createDimension('lon', self.grid.nlon_geo)
 
       time_dim = o.createDimension('time', None)
       time_out = o.createVariable('time', np.float64, ('time',))
@@ -310,22 +310,32 @@ def load_and_write(i):
   print(files[i])
   timestamp = files[i][-15:-3]
   ipe.read_h5(files[i])
-  ipe.write_netcdf(path.join(args.outdir,"IPE_Params.geo.{}.nc".format(timestamp)), 
+  ipe.write_netcdf(path.join(out_dir,"IPE_Params.geo.{}.nc".format(timestamp)), 
                    timestamp)
 
 
 ## input parsing options
 parser = ArgumentParser(description='Interpolate IPE Outputs to a geographic grid',
                         formatter_class=ArgumentDefaultsHelpFormatter)
-parser.add_argument('-g', '--gridfile', help='path to IPE_Grid.nc',      type=str, required=True)
-parser.add_argument('-i', '--indir',    help='path to input directory',  type=str, default="./")
-parser.add_argument('-o', '--outdir',   help='path to output directory', type=str, default="./")
-parser.add_argument('-keep', help="Include this flag to not delete the raw outputs", action='store_true')
-parser.add_argument('-n', '--nprocs',   help='Number of processors to use. Default=1', type=int, default=1)
+parser.add_argument('-g', '--gridfile', default=None,
+                    help='path to IPE_Grid.nc (default is to look in the input directory)')
+parser.add_argument('-i', '--indir',  type=str, default="./",
+                    help='path to input directory, if different from pwd')
+parser.add_argument('-o', '--outdir', default=None,
+                    help='path to output directory, if you do not want to write to indir')
+parser.add_argument('-keep', action='store_true',
+                    help="Include this flag to not delete the raw outputs")
+parser.add_argument('-n', '--nprocs', type=int, default=1,
+                    help='Number of processors to use.')
 args = parser.parse_args()
 
 
-ipe = IPE(args.gridfile)
+# Set defaults for outdir & gridfile
+out_dir = args.indir if args.outdir is None else args.outdir
+grid_file = path.join(args.indir, 'IPE_Grid.nc') if args.gridfile is None else args.gridfile
+
+# Read in grid, find input files
+ipe = IPE(grid_file)
 files = glob.glob(path.join(args.indir,"IPE_State.apex.*"))
 
 
