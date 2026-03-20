@@ -1,0 +1,22 @@
+
+BASEDIR=/home/ridley/Software/IPE/NewStructure
+
+BUILDDIR = ${BASEDIR}/build
+
+LIBDIR = ${BASEDIR}/lib
+BINDIR = ${BASEDIR}/bin
+
+RUNDIR = ${BASEDIR}/run
+DATADIR = ${BASEDIR}/srcData
+
+MILEDIR = ${BASEDIR}/ext/Electrodynamics
+
+FLIPDIR = ${BASEDIR}/srcFlip
+MSISDIR = ${BASEDIR}/srcMsis
+SHAREDDIR = ${BASEDIR}/srcShared
+EFIELDDIR = ${BASEDIR}/srcEfield
+DYNAMODIR = ${BASEDIR}/srcDynamo
+IPEDIR = ${BASEDIR}/src
+
+SCRIPTDIR = /home/ridley/Software/GITM/share/Scripts
+

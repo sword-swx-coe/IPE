@@ -1,0 +1,72 @@
+
+SHELL=/bin/sh
+
+COMPILE.f77     = ${CUSTOMPATH_F}mpifort
+COMPILE.f90     = ${CUSTOMPATH_F}mpifort
+LINK.f90	= ${CUSTOMPATH_MPI}mpifort
+AR = ar -rs
+
+SINGLEPREC = -frecord-marker=4
+DOUBLEPREC = -frecord-marker=4 -fdefault-real-8 -fdefault-double-8
+PRECISION  =
+# ${DOUBLEPREC} ${MEM}
+
+FORTRANMODULES = -I/usr/lib/x86_64-linux-gnu/fortran/gfortran-mod-15/
+INCLUDEDIR = -I/usr/local/include -I/usr/include
+HDF5INCLUDE = -I/usr/include/hdf5/openmpi
+ESMFMODULES = -I/home/ridley/Software/IPE/ESMF_src/Install/mod/modO/Linux.gfortran.64.mpiuni.default
+ESMFINCLUDE = -I/home/ridley/Software/IPE/ESMF_src/Install/include
+
+LIBRARYDIR = -L/usr/local/lib -L/usr/lib/x86_64-linux-gnu -L/usr/lib/x86_64-linux-gnu/hdf5/openmpi/
+LIBRARIES = -lcomio -lhdf5hl_fortran -lhdf5_hl -lhdf5_fortran -lhdf5 -lcrypto -lcurl -lsz -lz -ldl -lm -lpnetcdf
+
+PreProc = -DsysLinux -DcompGFORTRAN -DPACKAGE_NAME=\"ipe\" -DPACKAGE_TARNAME=\"ipe\" -DPACKAGE_VERSION=\"0.0.1\" -DPACKAGE_STRING=\"ipe\ 0.0.1\" -DPACKAGE_BUGREPORT=\"ipe_devteam@noaa.gov\" -DPACKAGE_URL=\"\" -DPACKAGE=\"ipe\" -DVERSION=\"0.0.1\" -DHAVE_MPI=1 -DHAVE_COMIO=1 -DHAVE_ESMF=1 
+
+#-I/usr/lib/x86_64-linux-gnu/hdf5/openmpi
+
+SEARCH = -I${SHAREDDIR} -I${MILEDIR}/src ${FORTRANMODULES} ${INCLUDEDIR} ${HDF5INCLUDE} ${ESMFMODULES} ${ESMFINCLUDE} ${EXTRASEARCH}
+
+DEBUGFLAG = -C -g -fbacktrace -ffpe-trap=invalid,zero,overflow -fcheck=all
+DEBUG     = 
+
+F77FLAGS =  -fno-unsafe-math-optimizations -ffixed-line-length-132
+
+OPT0 = -O0
+OPT1 = -O1
+OPT2 = -O2
+OPT3 = -O3
+OPT4 = -O4
+
+CFLAG = ${SEARCH} -w ${DEBUG} -fallow-argument-mismatch
+
+Cflag0  = ${CFLAG} ${PRECISION} ${OPT0}
+Cflag1  = ${CFLAG} ${PRECISION} ${OPT1}
+Cflag2  = ${CFLAG} ${PRECISION} ${OPT2}
+Cflag3  = ${CFLAG} ${PRECISION} ${OPT3}
+Cflag4  = ${CFLAG} ${PRECISION} ${OPT4}
+
+#
+#       General rules
+#
+
+.SUFFIXES:
+.SUFFIXES: .f90 .F90 .f .for .ftn .o
+
+.f90.o:
+	${COMPILE.f90} -c ${Cflag2} $<
+
+.F90.o:
+	${COMPILE.f90} -c ${PreProc} ${Cflag2} $<
+
+.f.o:
+	${COMPILE.f77} -c ${Cflag2} ${F77FLAGS} $<
+
+.for.o:
+	${COMPILE.f77} -c ${Cflag2} -ffixed-line-length-132 $<
+
+.ftn.o:
+	${COMPILE.f77} -c ${Cflag2} -ffixed-line-length-132 $<
+
+clean:	
+	rm -f *~ core *.o *.mod fort.* a.out *.exe *.a *.so *.protex ${MY_LIB}
+
