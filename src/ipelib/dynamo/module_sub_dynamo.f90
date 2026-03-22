@@ -12,16 +12,16 @@
       subroutine dynamo(rc)
 !     !USES:
       use ipe_error_module
-      use params_module,only: 
-     |  kmlon,  ! number of geomagnetic grid longitudes
-     |  kmlonp1,! kmlon+1
-     |  kmlat,  ! number of geomagnetic grid latitudes
-     |  kmlatp1,! kmlat+1
-     |  kmlath  ! (kmlat+1)/2 (index to magnetic equator)
-      use dynamo_module,only:zigm11,zigm22,zigmc,zigm2,rim,phim,phihm   &
-     &,isolve,ncee,cee,nc,nc0,nc1,nc2,nc3,nc4,cofum,rhs,c0,c1,c2,c3,c4  &
-     &,kmlon0,kmlon1,kmlon2,kmlon3,kmlon4,kmlat0,kmlat1,kmlat2,kmlat3   &
-     &,kmlat4,pfrac,jn,jp
+      use params_module,only: &
+       kmlon, & ! number of geomagnetic grid longitudes
+       kmlonp1, &! kmlon+1
+       kmlat, & ! number of geomagnetic grid latitudes
+       kmlatp1, &! kmlat+1
+       kmlath  ! (kmlat+1)/2 (index to magnetic equator)
+      use dynamo_module,only:zigm11,zigm22,zigmc,zigm2,rim,phim,phihm,   &
+           isolve,ncee,cee,nc,nc0,nc1,nc2,nc3,nc4,cofum,rhs,c0,c1,c2,c3,c4,  &
+           kmlon0,kmlon1,kmlon2,kmlon3,kmlon4,kmlat0,kmlat1,kmlat2,kmlat3,   &
+           kmlat4,pfrac,jn,jp
       use cons_module,only: dlatm,dlonm,pi_dyn,xlatm,rtd
       use module_transf,ONLY:transf
       use module_rhspde,ONLY:rhspde
@@ -252,8 +252,7 @@
       call edges(c2,kmlon2,kmlat2)
       call edges(c3,kmlon3,kmlat3)
       call edges(c4,kmlon4,kmlat4)
-      if (isolve==2) 
-     |  call edges(cofum,kmlon0,kmlat0)
+      if (isolve==2) call edges(cofum,kmlon0,kmlat0)
 !
 ! Divide stencils by cos(lam_0) (not rhs):
       call divide(c0,kmlon0,kmlat0,kmlon0,kmlat0,cs,1)
@@ -261,8 +260,7 @@
       call divide(c2,kmlon2,kmlat2,kmlon0,kmlat0,cs,1)
       call divide(c3,kmlon3,kmlat3,kmlon0,kmlat0,cs,1)
       call divide(c4,kmlon4,kmlat4,kmlon0,kmlat0,cs,1)
-      if (isolve==2) 
-     |  call divide(cofum,kmlon0,kmlat0,kmlon0,kmlat0,cs,0)
+      if (isolve==2) call divide(cofum,kmlon0,kmlat0,kmlon0,kmlat0,cs,0)
 !
 ! Set value of solution to 1. at pole:
       do i=1,kmlon0
@@ -300,35 +298,29 @@
       ier = 0 
       if(isolve==0) then
         call mud(rim,jntl,isolve,ier,lrc) ! solver in mud.F
-        if (ipe_error_check(lrc,msg="call to mud failed (isolve=0)",
-     &    rc=rc)) return
+        if (ipe_error_check(lrc,msg="call to mud failed (isolve=0)", rc=rc)) return
         if(ier < 0) then ! not converged
-          call ipe_warning_log(
-     &      msg="mud not converged: use direct solver")
+          call ipe_warning_log( msg="mud not converged: use direct solver")
           call muh(rim,jntl,lrc) ! solver in mud.F
-          if (ipe_error_check(lrc,msg="call to muh failed (isolve=0)",
-     &      rc=rc))
-     &      return
+          if (ipe_error_check(lrc, &
+               msg="call to muh failed (isolve=0)", rc=rc)) return
         endif
       elseif (isolve==1) then
         call muh(rim,jntl,lrc)        ! solver in muh2cr.F
-        if (ipe_error_check(lrc,msg="call to muh failed (isolve=1)",
-     &    rc=rc)) return
+        if (ipe_error_check(lrc, &
+             msg="call to muh failed (isolve=1)", rc=rc)) return
       elseif (isolve==2) then
         call mudmod(rim,jntl,isolve,ier,lrc)! solver in mudmod.F
-        if (ipe_error_check(lrc,msg="call to mudmod failed (isolve=2)",
-     &    rc=rc)) return
+        if (ipe_error_check(lrc, &
+             msg="call to mudmod failed (isolve=2)", rc=rc)) return
         if(ier < 0) then ! not converged
-          call ipe_warning_log(
-     &      msg="mud not converged: use direct solver")
+          call ipe_warning_log(msg="mud not converged: use direct solver")
           call muh(rim,jntl,lrc) ! solver in mud.F
-          if (ipe_error_check(lrc,msg="call to muh failed (isolve=2)",
-     &      rc=rc))
-     &      return
+          if (ipe_error_check(lrc,&
+               msg="call to muh failed (isolve=2)", rc=rc)) return
         endif
       else
-        call ipe_error_set(msg='dynamo: solver type not implemented.',
-     &    rc=rc)
+        call ipe_error_set(msg='dynamo: solver type not implemented.', rc=rc)
         return
       endif
 !

@@ -25,7 +25,7 @@
 !
 ! Location of W05scEpot.dat, W05SCHAtable.dat, W05scBndy.dat
 !  character*7  :: file_location = 'moddta/'
-      character(len=*),parameter  :: fileLocation = './'
+      character(len=*),parameter  :: fileLocation = 'UA/dataIn'
 !
       real*8 :: rad2deg,deg2rad ! set by setmodel
       real*8 :: bndyfitr        ! calculated by setboundary
@@ -41,9 +41,15 @@
       contains
 !----------------------------------------------------------------------
 !----------------------------------------------------------------------
-      subroutine setmodel2005Ipe(angle,bt,tilt,swvel,swden,file_path    &
-     &,model,rc)
-      implicit none
+        subroutine setmodel2005Ipe(angle, &
+             bt, &
+             tilt, &
+             swvel, &
+             swden, &
+             file_path, &
+             model, &
+             rc)
+          implicit none
 !
 ! Args:
 !
@@ -62,40 +68,40 @@
 !
       if (present(rc)) rc = IPE_SUCCESS
 !
-      if (ipe_status_check(trim(model)=='epot'.or.trim(model)=='bpot',
-     &  msg="unrecognized model: "//trim(model)
-     &  //" - must be either epot or bpot", rc=rc)) return
+      if (ipe_status_check(trim(model)=='epot' .or. &
+           trim(model)=='bpot', &
+           msg="unrecognized model: " // trim(model) // &
+           " - must be either epot or bpot", rc=rc)) return
 
 !   write(6,"('setmodel: angle=',f8.2,' bt=',f8.2,' tilt=',f8.2,' swvel=',&
 !     &f8.2,' swden=',f8.2)") angle,bt,tilt,swvel,swden
 !
 ! Read data:
       if (trim(model) == 'epot') then
-      call read_potential2005Ipe('global_idea_coeff_W05scEpot.dat'
-     &  ,rc=lrc)
-      if (ipe_error_check(lrc,
-     &  msg="call to read_potential2005Ipe failed - model="//model,
-     &  rc=rc)) return
+         call read_potential2005Ipe( &
+              fileLocation // '/global_idea_coeff_W05scEpot.dat', rc=lrc)
+      if (ipe_error_check(lrc, &
+           msg="call to read_potential2005Ipe failed - model=" // model, &
+           rc=rc)) return
       else
-      call read_potential2005Ipe('global_idea_coeff_W05scBpot.dat'
-     & ,rc=lrc)
-      if (ipe_error_check(lrc,
-     &  msg="call to read_potential2005Ipe failed - model="//model,
-     &  rc=rc)) return
+         call read_potential2005Ipe( &
+              fileLocation // '/global_idea_coeff_W05scBpot.dat', rc=lrc)
+         if (ipe_error_check(lrc, &
+              msg="call to read_potential2005Ipe failed - model="//model, &
+              rc=rc)) return
       endif
-      call schatable2005Ipe('global_idea_coeff_W05SCHAtable.dat',
-     &  rc=lrc)
-      if (ipe_error_check(lrc,
-     &  msg="call to schatable2005Ipe failed",rc=rc)) return
+      call schatable2005Ipe( &
+           fileLocation // '/global_idea_coeff_W05SCHAtable.dat', rc=lrc)
+      if (ipe_error_check(lrc, &
+           msg="call to schatable2005Ipe failed",rc=rc)) return
 !
       pi = 4.*atan(1.)
       rad2deg = 180./pi
       deg2rad = pi/180.
 !     
-      call setboundary2005Ipe(angle,bt,tilt,swvel,swden,file_path
-     &  ,rc=lrc)
-      if (ipe_error_check(lrc,
-     &  msg="call to setboundary2005Ipe failed",rc=rc)) return
+      call setboundary2005Ipe(angle,bt,tilt,swvel,swden,file_path, rc=lrc)
+      if (ipe_error_check(lrc, &
+           msg="call to setboundary2005Ipe failed",rc=rc)) return
 !
       stilt = sin(tilt*deg2rad)
       stilt2 = stilt**2
@@ -116,9 +122,9 @@
       endif
       cfits = schfits           ! schfits(d1_pot,csize) is in module w05read_data
       a = (/c0      , swe       , stilt      , stilt2     , swp,        &
-     &     swe*cosa, stilt*cosa, stilt2*cosa, swp*cosa,                 &
-     &     swe*sina, stilt*sina, stilt2*sina, swp*sina,                 &
-     &     swe*cos2a,swe*sin2a/)
+           swe*cosa, stilt*cosa, stilt2*cosa, swp*cosa,                 &
+           swe*sina, stilt*sina, stilt2*sina, swp*sina,                 &
+           swe*cos2a,swe*sin2a/)
       if (trim(model) == 'epot') then
          esphc(:) = 0.
          do j=1,csize
@@ -138,8 +144,7 @@
       endif
       end subroutine setmodel2005Ipe
 !-----------------------------------------------------------------------
-      subroutine setboundary2005Ipe(angle,bt,tilt,swvel,swden,file_path &
-     &,rc)
+      subroutine setboundary2005Ipe(angle,bt,tilt,swvel,swden,file_path,rc)
       implicit none
 !
 ! Args:
@@ -157,9 +162,10 @@
 !   write(6,"('Enter setboundary: angle=',f8.3,' bt=',f8.3)") angle,bt
 !
 ! Read data:
-      call read_bndy2005Ipe('global_idea_coeff_W05scBndy.dat',rc=lrc)
-      if (ipe_error_check(lrc,msg="call to read_bndy2005Ipe failed",
-     &  rc=rc)) return
+      call read_bndy2005Ipe( &
+           fileLocation // '/global_idea_coeff_W05scBndy.dat',rc=lrc)
+      if (ipe_error_check(lrc,msg="call to read_bndy2005Ipe failed", rc=rc)) &
+           return
 !
 ! Calculate the transformation matrix to the coordinate system
 ! of the offset pole.
@@ -373,8 +379,7 @@
 !         &' nlms(j)=',f8.4)") j,l,m,nlms(j)
 
 ! real*8 :: plmtable(mxtablesize,csize)
-            call pm_n2005Ipe(m,nlms(j),cth,plmtable(1:tablesize,j)      &
-     &           ,tablesize)
+            call pm_n2005Ipe(m,nlms(j),cth,plmtable(1:tablesize,j),tablesize)
 !     write(6,"('scplm: j=',i3,' indx=',i3,' plmtable(:,j)=',/,(6e12.4))") &
 !         j,indx,plmtable(1:tablesize,j)
 
@@ -391,8 +396,8 @@
       nlm = nlms(indx)
       colata(1) = colat
       
-      call interpol_quad2005Ipe(plmtable(1:tablesize,indx)              &
-     &     ,colattable(1:tablesize),colata,output)
+      call interpol_quad2005Ipe(plmtable(1:tablesize,indx), &
+           colattable(1:tablesize),colata,output)
       scplm2005Ipe = output(1)
 
 !   write(6,"('scplm: indx=',i3,' scplm=',e12.4,' plmtable=',/,(6e12.4))") &
@@ -489,8 +494,8 @@
       endif
     
       rm = float(m)
-      km_n2005Ipe = sqrt(2.*exp(lngamma2005Ipe(rn+rm+1.)                &
-     & -lngamma2005Ipe(rn-rm+1.))) / (2.**m*factorial2005Ipe(m))
+      km_n2005Ipe = sqrt(2.*exp(lngamma2005Ipe(rn+rm+1.)  &
+           -lngamma2005Ipe(rn-rm+1.))) / (2.**m*factorial2005Ipe(m))
 !   write(6,"('km_n: m=',i3,' rn=',f8.4,' km_n=',e12.4)") m,rn,km_n
 
       end function km_n2005Ipe
@@ -514,20 +519,18 @@
       kk = k+1
       mm = m+1
       if (kk > maxk_scha) then
-         write(6,"('>>> nkmlookup: kk > maxk: kk=',i4,' maxk=',i4)") kk &
-     &    ,maxk_scha
-         call interpol_quad2005Ipe(allnkm(maxk_scha,mm,:),th0s,th0a,out &
-     & )
+         write(6,"('>>> nkmlookup: kk > maxk: kk=',i4,' maxk=',i4)") &
+              kk, maxk_scha
+         call interpol_quad2005Ipe(allnkm(maxk_scha,mm,:),th0s,th0a,out)
       endif
       if (mm > maxm_scha) then
-         write(6,"('>>> nkmlookup: mm > maxm: kk=',i4,' maxm=',i4)") kk &
-     &    ,maxm_scha
-         call interpol_quad2005Ipe(allnkm(kk,maxm_scha,:),th0s,th0a,out &
-     & )
+         write(6,"('>>> nkmlookup: mm > maxm: kk=',i4,' maxm=',i4)") &
+              kk, maxm_scha
+         call interpol_quad2005Ipe(allnkm(kk,maxm_scha,:),th0s,th0a,out)
       endif
       if (th0 < th0s(1)) then
-         write(6,"('>>> nkmlookup: th0 < th0s(1): th0=',e12.4,          &
-     & ' th0s(1)=',e12.4)") th0,th0s(1)
+         write(6,"('>>> nkmlookup: th0 < th0s(1): th0=',e12.4, &
+              ' th0s(1)=',e12.4)") th0,th0s(1)
       endif
 
 !   write(6,"('nkmlookup call interpol: kk=',i3,' mm=',i3,' th0=',e12.4,&
@@ -616,8 +619,7 @@
       nx = size(x)
       nu = size(u)
       if (nx /= nv) then
-         write(6,"('>>> interpol_quad: nx /= nv: nx=',i4,' nv=',i4)")   &
-     &    nx,nv
+         write(6,"('>>> interpol_quad: nx /= nv: nx=',i4,' nv=',i4)") nx,nv
          p(:) = 0.
          return
       endif
@@ -635,8 +637,8 @@
             p(i) = 0.0
          else
             p(i) = v(ix-1) * (u(i)-x1) * (u(i)-x2)/((x0-x1) * (x0-x2))+ &
-     &             v(ix)   * (u(i)-x0) * (u(i)-x2)/((x1-x0) * (x1-x2))+ &
-     &             v(ix+1) * (u(i)-x0) * (u(i)-x1)/((x2-x0) * (x2-x1))
+                 v(ix)   * (u(i)-x0) * (u(i)-x2)/((x1-x0) * (x1-x2))+ &
+                 v(ix+1) * (u(i)-x0) * (u(i)-x1)/((x2-x0) * (x2-x1))
          endif
       enddo
 !   write(6,"('interpol_quad: nu=',i4,' p=',/,(1pe12.4)") nu,p
@@ -681,9 +683,12 @@
       implicit none
       real*8,intent(in) :: xx
       real*8 :: x,y,tmp,ser
-      real*8 :: cof(6) = (/76.18009172947146, -86.50532032941677        &
-     &,24.01409824083091                                                &
-     &,-1.231739572450155, 0.1208650973866179e-2, -0.5395239384953e-5/)
+      real*8 :: cof(6) = (/76.18009172947146, &
+           -86.50532032941677, &
+           24.01409824083091, &
+           -1.231739572450155, &
+           0.1208650973866179e-2, &
+           -0.5395239384953e-5/)
       integer :: j
 !
       y = xx
@@ -738,63 +743,52 @@
       if (present(rc)) rc = IPE_SUCCESS
 !
       open(lu,file=infile,status='old',ACCESS='SEQUENTIAL',iostat=stat)
-      if (ipe_iostatus_check(stat, msg="error opening file "//infile,
-     &  rc=rc)) return
+      if (ipe_iostatus_check(stat, msg="error opening file "//infile, rc=rc)) return
       read(lu,"(a)",iostat=stat) fname
-      if (ipe_iostatus_check(stat, msg="error reading filename",
-     &  rc=rc)) return
+      if (ipe_iostatus_check(stat, msg="error reading filename", rc=rc)) return
       read(lu,"(28i3)",iostat=stat) ab
-      if (ipe_iostatus_check(stat, msg="error reading db",
-     &  rc=rc)) return
+      if (ipe_iostatus_check(stat, msg="error reading db", rc=rc)) return
       read(lu,"(3i3)",iostat=stat) csize_rd,d1_rd,d2_rd
-      if (ipe_iostatus_check(stat, msg="error reading csize",
-     &  rc=rc)) return
+      if (ipe_iostatus_check(stat, msg="error reading csize", rc=rc)) return
       if (csize_rd /= csize) then
-         write(errmsg,"('>>> read_potential: file ',a                   &
-     &,': incompatible csize: ','csize_rd=',i4,' csize=',i4)")          &
-     &        fname,csize_rd,csize
+         write(errmsg,"('>>> read_potential: file ', a, &
+              ': incompatible csize: ','csize_rd=',i4,' csize=',i4)") &
+              fname,csize_rd,csize
          call ipe_error_set(msg=errmsg,rc=rc)
          return
       endif
       if (d1_rd /= d1_pot) then
-         write(errmsg,
-     & "('>>> read_potential: file ',a,': incompatible d1: '            &
-     &,'d1_rd=',i4,' d1_pot=',i4)") fname,d1_rd,d1_pot
+         write(errmsg, &
+              "('>>> read_potential: file ',a,': incompatible d1: ', &
+              'd1_rd=',i4,' d1_pot=',i4)") fname,d1_rd,d1_pot
          call ipe_error_set(msg=errmsg,rc=rc)
          return
       endif
       if (d2_rd /= d2_pot) then
-         write(errmsg,
-     & "('>>> read_potential: file ',a,': incompatible d2: '            &
-     &,'d2_rd=',i4,' d2_pot=',i4)") fname,d2_rd,d2_pot
+         write(errmsg, "('>>> read_potential: file ',a,': incompatible d2: ', &
+              'd2_rd=',i4,' d2_pot=',i4)") fname,d2_rd,d2_pot
          call ipe_error_set(msg=errmsg,rc=rc)
          return
       endif
       do i=1,csize
          read(lu,"(6e20.9)",iostat=stat) alschfits(:,i)
-         if (ipe_iostatus_check(stat, msg="error reading alschfits",
-     &     rc=rc)) return
+         if (ipe_iostatus_check(stat, msg="error reading alschfits", rc=rc)) return
       enddo
       read(lu,"(2f10.3)",iostat=stat) ex_pot
-      if (ipe_iostatus_check(stat, msg="error reading ex_pot",
-     &  rc=rc)) return
+      if (ipe_iostatus_check(stat, msg="error reading ex_pot", rc=rc)) return
       read(lu,"(28i3)",iostat=stat) ls
-      if (ipe_iostatus_check(stat, msg="error reading ls",
-     &  rc=rc)) return
+      if (ipe_iostatus_check(stat, msg="error reading ls", rc=rc)) return
       read(lu,"(2i3)",iostat=stat) maxl_pot,maxm_pot
-      if (ipe_iostatus_check(stat, msg="error reading max pot",
-     &  rc=rc)) return
+      if (ipe_iostatus_check(stat, msg="error reading max pot", rc=rc)) return
       read(lu,"(28i3)",iostat=stat) ms
-      if (ipe_iostatus_check(stat, msg="error reading ms",
-     &  rc=rc)) return
+      if (ipe_iostatus_check(stat, msg="error reading ms", rc=rc)) return
       do i=1,csize
          read(lu,"(6e20.9)",iostat=stat) schfits(:,i)
-         if (ipe_iostatus_check(stat, msg="error reading schfits",
-     &     rc=rc)) return
+         if (ipe_iostatus_check(stat, msg="error reading schfits", rc=rc)) return
       enddo
       close(lu,iostat=stat)
-      if (ipe_iostatus_check(stat,
-     &  msg="error closing file "//infile, rc=rc)) return
+      if (ipe_iostatus_check(stat, &
+           msg = "error closing file " // infile, rc=rc)) return
       end subroutine read_potential2005Ipe
 !-----------------------------------------------------------------------
       subroutine schatable2005Ipe(infile,rc)
@@ -816,27 +810,22 @@
       if (present(rc)) rc = IPE_SUCCESS
 !
       open(lu,file=infile,status='old',ACCESS='SEQUENTIAL',iostat=stat)
-      if (ipe_iostatus_check(stat, msg="error opening file "//infile,
-     &  rc=rc)) return
+      if (ipe_iostatus_check(stat, msg="error opening file "//infile, rc=rc)) return
       read(lu,"(a)",iostat=stat) fname
-      if (ipe_iostatus_check(stat, msg="error reading filename",
-     &  rc=rc)) return
+      if (ipe_iostatus_check(stat, msg="error reading filename", rc=rc)) return
       read(lu,"(2i3)",iostat=stat) maxk_scha,maxm_scha
-      if (ipe_iostatus_check(stat, msg="error reading max k,m scha",
-     &  rc=rc)) return
+      if (ipe_iostatus_check(stat, msg="error reading max k,m scha", rc=rc)) return
       do i=1,d3_scha
          do j=1,d2_scha
             read(lu,"(6e20.9)",iostat=stat) allnkm(:,j,i)
-            if (ipe_iostatus_check(stat,
-     &        msg="error reading allnkm array", rc=rc)) return
+            if (ipe_iostatus_check(stat, &
+                 msg="error reading allnkm array", rc=rc)) return
          enddo
       enddo
       read(lu,"(8f10.4)",iostat=stat) th0s
-      if (ipe_iostatus_check(stat,
-     &  msg="error reading th0s", rc=rc)) return
+      if (ipe_iostatus_check(stat, msg="error reading th0s", rc=rc)) return
       close(lu,iostat=stat)
-      if (ipe_iostatus_check(stat,
-     &  msg="error closing file "//infile, rc=rc)) return
+      if (ipe_iostatus_check(stat, msg="error closing file "//infile, rc=rc)) return
       end subroutine schatable2005Ipe
 !-----------------------------------------------------------------------
       subroutine read_bndy2005Ipe(infile,rc)
@@ -857,40 +846,31 @@
       integer :: stat,rd_na,rd_nb,lu=20
 !
       open(lu,file=infile,status='old',ACCESS='SEQUENTIAL',iostat=stat)
-      if (ipe_iostatus_check(stat, msg="error opening file "//infile,
-     &  rc=rc)) return
+      if (ipe_iostatus_check(stat, msg="error opening file "//infile, rc=rc)) return
       read(lu,"(a)",iostat=stat) fname
-      if (ipe_iostatus_check(stat, msg="error reading filename",
-     &  rc=rc)) return
+      if (ipe_iostatus_check(stat, msg="error reading filename", rc=rc)) return
       read(lu,"(2i3)",iostat=stat) rd_na,rd_nb
-      if (ipe_iostatus_check(stat, msg="error reading rd_na, rd_nb",
-     &  rc=rc)) return
+      if (ipe_iostatus_check(stat, msg="error reading rd_na, rd_nb", rc=rc)) return
       if (rd_na /= na) then
-        write(errmsg,
-     &"('>>> read_potential: file ',a,': incompatible na: ',            &
-     &'rd_na=',i4,' na=',i4)") fname,rd_na,na
+        write(errmsg, "('>>> read_potential: file ',a,': incompatible na: ', &
+             'rd_na=',i4,' na=',i4)") fname,rd_na,na
         call ipe_error_set(msg=errmsg, rc=rc)
         return
       endif
       if (rd_nb /= nb) then
-        write(errmsg,
-     &"('>>> read_potential: file ',a,': incompatible nb: ',            &
-     &'rd_nb=',i4,' nb=',i4)") fname,rd_nb,nb
+        write(errmsg, "('>>> read_potential: file ',a,': incompatible nb: ', &
+             'rd_nb=',i4,' nb=',i4)") fname,rd_nb,nb
         call ipe_error_set(msg=errmsg, rc=rc)
         return
       endif
       read(lu,"(8e20.9)",iostat=stat) bndya
-      if (ipe_iostatus_check(stat,
-     &  msg="error reading bndya", rc=rc)) return
+      if (ipe_iostatus_check(stat, msg="error reading bndya", rc=rc)) return
       read(lu,"(8e20.9)",iostat=stat) bndyb
-      if (ipe_iostatus_check(stat,
-     &  msg="error reading bndyb", rc=rc)) return
+      if (ipe_iostatus_check(stat, msg="error reading bndyb", rc=rc)) return
       read(lu,"(8e20.9)",iostat=stat) ex_bndy
-      if (ipe_iostatus_check(stat,
-     &  msg="error reading ex_bndy", rc=rc)) return
+      if (ipe_iostatus_check(stat, msg="error reading ex_bndy", rc=rc)) return
       close(lu,iostat=stat)
-      if (ipe_iostatus_check(stat,
-     &  msg="error closing file "//infile, rc=rc)) return
+      if (ipe_iostatus_check(stat, msg="error closing file "//infile, rc=rc)) return
       end subroutine read_bndy2005Ipe
 !-----------------------------------------------------------------------
       end module module_weimer2005Ipe
