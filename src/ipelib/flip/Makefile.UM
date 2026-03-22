@@ -1,0 +1,44 @@
+
+include ../../../build/Makefile.dirs
+include ${BUILDDIR}/Makefile.conf
+
+MY_LIB = ${LIBDIR}/libFlip.a
+
+OBJECTS = \
+	CTIPE-int.o\
+	CMINOR.o\
+	ELECXS.o\
+	FLIP_GRID.o\
+	INIT-PROFILES.o\
+	KEMPRN.o\
+	MINORA.o\
+	Neut_Heating.o\
+	Photoel-Freqs.o\
+	RSDENA_EXB.o\
+	RSJACA.o\
+	RSLPSD.o\
+	RSLPST.o\
+	RSPE2B.o\
+	RSPRIM.o\
+	RSTEMC_EXB.o\
+	Rates.o
+
+# These may not even be compiled???
+# ASFLIPIO.f
+# FLIPAP.f
+# FLIPSUBS.f
+# FLIPWIND.f
+# FLIP_PC.f
+# GET_PARAMS.f
+# IRI95.f
+# MagDec.f
+# RSSUBC.f
+
+LIB:
+	@echo '--> Compiling FLIP in ${FLIPDIR} <--'
+	@make --no-print-directory -f Makefile.UM ${MY_LIB}
+
+${MY_LIB}: ${MF} ${MODULES} ${OBJECTS}
+	@echo '--> Creating FLIP library <--'
+	@rm -f ${MY_LIB}
+	${AR} ${MY_LIB} ${MODULES} ${OBJECTS}

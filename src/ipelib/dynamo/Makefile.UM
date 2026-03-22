@@ -1,0 +1,48 @@
+include ../../../build/Makefile.dirs
+include ${BUILDDIR}/Makefile.conf
+
+MY_LIB = ${LIBDIR}/libDynamo.a
+
+OBJECTS = \
+	params.o\
+	cons_module.o\
+	dynamo_module.o\
+	heelis_module.o\
+	module_ceee.o\
+	module_clearcee.o\
+	module_cnm.o\
+	module_cnmmod.o\
+	module_magfield.o\
+	module_colath.o\
+	module_divide.o\
+	module_edges.o\
+	module_flwv32.o\
+	module_potm.o\
+	module_sub_heelis.o\
+	module_weimer2005Ipe.o\
+	module_init_heelis.o\
+	module_highlat.o\
+	module_htrpex.o\
+	module_init_cons.o\
+	module_rhspde.o\
+	module_stencil.o\
+	module_stencmd.o\
+	module_stenmd.o\
+	module_stenmod.o\
+	module_threed.o\
+	module_transf.o\
+	module_sub_dynamo.o\
+	mudcom.o\
+	mud.o\
+	mudmod.o\
+	muh2cr.o\
+	util.o\
+
+LIB:
+	@echo '--> Compiling Dynamo in ${DYNAMODIR} <--'
+	@make --no-print-directory -f Makefile.UM ${MY_LIB}
+
+${MY_LIB}: ${MF} ${MODULES} ${OBJECTS}
+	@echo '--> Creating Dynamo library <--'
+	@rm -f ${MY_LIB}
+	${AR} ${MY_LIB} ${MODULES} ${OBJECTS}

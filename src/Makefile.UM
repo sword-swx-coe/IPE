@@ -1,0 +1,49 @@
+include ../build/Makefile.dirs
+include ${BUILDDIR}/Makefile.conf
+
+MY_LIB = ${LIBDIR}/libIPE.a
+
+EXTRASEARCH = -I${MSISDIR} -I${EFIELDDIR} -I${DYNAMODIR} -I${IPEDIR}
+
+MODULES = \
+	IPE_Precision.o\
+	IPE_Common_Routines.o\
+	IPE_Constants_Dictionary.o\
+	IPE_MPI_Layer_Class.o\
+	IPE_Model_Parameters_Class.o\
+	IPE_Forcing_Class.o\
+	IPE_Grid_Class.o\
+	IPE_Time_Class.o\
+	IPE_Neutrals_Class.o\
+	IPE_Plasma_Class.o\
+	IPE_Electrodynamics_Class.o\
+	IPE_Model_Class.o
+
+OBJECTS_EXE = IPE_Driver.o
+
+EXE = ${BINDIR}/ipe.exe
+
+IPE:	
+	@rm -f ${EXE}
+	@make -f Makefile.UM ${EXE}
+	@echo
+	@echo "${EXE} has been created"
+	@echo
+
+${EXE}:	${OBJECTS_EXE}
+	${LINK.f90}  ${Cflag2} \
+		-L${LIBDIR} ${LIBRARYDIR} \
+		-o ${EXE} ${OBJECTS_EXE} \
+		-lIPE -lEfield -lDynamo -lFlip -lMsise -lShared \
+		-L${MILEDIR}/lib -lIE \
+		${Lflag1}  ${LIBRARIES}
+
+LIB:
+	@echo '--> Compiling IPE Main Functions in ${IPEDIR} <--'
+	@make --no-print-directory -f Makefile.UM ${MY_LIB}
+
+${MY_LIB}: ${MF} ${MODULES} ${OBJECTS}
+	@echo '--> Creating IPE library <--'
+	@rm -f ${MY_LIB}
+	${AR} ${MY_LIB} ${MODULES} ${OBJECTS}
+

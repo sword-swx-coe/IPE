@@ -1,0 +1,20 @@
+include ../../../build/Makefile.dirs
+include ${BUILDDIR}/Makefile.conf
+
+MY_LIB = ${LIBDIR}/libEfield.a
+
+OBJECTS = \
+	apex_sunloc_empirical.o\
+	weimer2005_ipe.o\
+	efield_ipe.o
+
+#apex_sunloc.f
+
+LIB:
+	@echo '--> Compiling Efield in ${EFIELDDIR} <--'
+	@make --no-print-directory -f Makefile.UM ${MY_LIB}
+
+${MY_LIB}: ${MF} ${MODULES} ${OBJECTS}
+	@echo '--> Creating Efield library <--'
+	@rm -f ${MY_LIB}
+	${AR} ${MY_LIB} ${MODULES} ${OBJECTS}
