@@ -1,0 +1,72 @@
+
+include build/Makefile.dirs
+
+default: IPE
+
+IPE:
+	if [ -d ${MILEDIR} ]; then \
+		cd $(MILEDIR); \
+		echo "--> Entering ${MILEDIR}" ; \
+		make --no-print-directory DIRSFILE=${DIRSFILE} LIB; \
+	fi
+	@cd ${SHAREDDIR}; \
+		echo "--> Entering ${SHAREDDIR}"; \
+		make --no-print-directory -f Makefile.UM DIRSFILE=${DIRSFILE} LIB
+	@cd $(MSISDIR); \
+		echo "--> Entering ${MSISDIR}" ; \
+		make --no-print-directory -f Makefile.UM LIB
+	@cd $(EFIELDDIR); \
+		echo "--> Entering ${EFIELDDIR}"; \
+		make --no-print-directory -f Makefile.UM LIB
+	@cd ${DYNAMODIR}; \
+		echo "--> Entering ${DYNAMODIR}"; \
+		make --no-print-directory -f Makefile.UM LIB
+	@cd $(FLIPDIR); \
+		echo "--> Entering ${FLIPDIR}"; \
+		make --no-print-directory -f Makefile.UM LIB
+	@cd $(IPEDIR); \
+		echo "--> Entering ${IPEDIR}"; \
+		make --no-print-directory -f Makefile.UM LIB
+	@cd $(MAINDIR); \
+		echo "--> Entering ${MAINDIR}"; \
+		make --no-print-directory -f Makefile.UM IPE
+
+clean:
+	if [ -d ${MILEDIR} ]; then \
+		cd $(MILEDIR); \
+		echo "--> Entering ${MILEDIR}" ; \
+		make --no-print-directory cleanall; \
+	fi
+	@cd ${SHAREDDIR}; \
+		echo "--> Entering ${SHAREDDIR}"; \
+		make --no-print-directory -f Makefile.UM DIRSFILE=${DIRSFILE} clean
+	@cd ${MSISDIR}; \
+		echo "--> Entering ${MSISDIR}"; \
+		make --no-print-directory -f Makefile.UM clean
+	@cd ${EFIELDDIR}; \
+		echo "--> Entering ${EFIELDDIR}"; \
+		make --no-print-directory -f Makefile.UM clean
+	@cd ${DYNAMODIR}; \
+		echo "--> Entering ${DYNAMODIR}"; \
+		make --no-print-directory -f Makefile.UM clean
+	@cd ${FLIPDIR}; \
+		echo "--> Entering ${FLIPDIR}"; \
+		make --no-print-directory -f Makefile.UM clean
+	@cd ${IPEDIR}; \
+		echo "--> Entering ${IPEDIR}"; \
+		make --no-print-directory -f Makefile.UM clean
+	@cd ${MAINDIR}; \
+		echo "--> Entering ${MAINDIR}"; \
+		make --no-print-directory -f Makefile.UM clean
+	rm -f bin/ipe.exe
+
+rundir:
+	@echo "--> Making ${RUNDIR}"
+	@mkdir -p ${RUNDIR}
+	@mkdir -p ${RUNDIR}/UA
+	cd ${RUNDIR}/UA; \
+		mkdir -p output dataIn; \
+		ln -s ${DATADIR}/* dataIn
+	cd ${RUNDIR}; \
+		ln -s ${BINDIR}/ipe.exe .; \
+		cp ${DATADIR}/IPE.inp .
