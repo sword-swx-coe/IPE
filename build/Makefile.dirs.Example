@@ -1,7 +1,9 @@
 
-BASEDIR=/home/ridley/Software/IPE/NewStructure
+BASEDIR=/home/ridley/Software/IPE/IPE.git
+
 
 BUILDDIR = ${BASEDIR}/build
+DIRSFILE = ${BUILDDIR}/Makefile.dirs
 
 LIBDIR = ${BASEDIR}/lib
 BINDIR = ${BASEDIR}/bin
@@ -11,12 +13,13 @@ DATADIR = ${BASEDIR}/srcData
 
 MILEDIR = ${BASEDIR}/ext/Electrodynamics
 
-FLIPDIR = ${BASEDIR}/srcFlip
-MSISDIR = ${BASEDIR}/srcMsis
-SHAREDDIR = ${BASEDIR}/srcShared
-EFIELDDIR = ${BASEDIR}/srcEfield
-DYNAMODIR = ${BASEDIR}/srcDynamo
-IPEDIR = ${BASEDIR}/src
+FLIPDIR = ${BASEDIR}/src/ipelib/flip
+MSISDIR = ${BASEDIR}/src/ipelib/msise00
+SHAREDDIR = ${BASEDIR}/src/ipelib/shared
+EFIELDDIR = ${BASEDIR}/src/ipelib/empirical_efield
+DYNAMODIR = ${BASEDIR}/src/ipelib/dynamo
+IPEDIR = ${BASEDIR}/src/ipelib
+MAINDIR = ${BASEDIR}/src
 
 SCRIPTDIR = /home/ridley/Software/GITM/share/Scripts
 
