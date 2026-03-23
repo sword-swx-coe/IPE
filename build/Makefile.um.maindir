@@ -35,7 +35,7 @@ clean:
 	if [ -d ${MILEDIR} ]; then \
 		cd $(MILEDIR); \
 		echo "--> Entering ${MILEDIR}" ; \
-		make --no-print-directory cleanall; \
+		make --no-print-directory DIRSFILE=${DIRSFILE} cleanall; \
 	fi
 	@cd ${SHAREDDIR}; \
 		echo "--> Entering ${SHAREDDIR}"; \
