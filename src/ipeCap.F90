@@ -33,7 +33,7 @@ module ipeCap
 
   implicit none
 
-  integer, parameter :: importFieldCount = 7
+  integer, parameter :: importFieldCount = 11
   character(len=22), dimension(importFieldCount, 2), parameter :: &
     importFieldNames = reshape ((/ &
         "temp_neutral          ", "3d                    ", &
@@ -42,7 +42,11 @@ module ipeCap
         "upward_wind_neutral   ", "3d                    ", &
         "O_Density             ", "3d                    ", &
         "O2_Density            ", "3d                    ", &
-        "N2_Density            ", "3d                    "  &
+        "N2_Density            ", "3d                    ", &
+        "jFac                  ", "2d                    ", &
+        "Epot                  ", "2d                    ", &
+        "Aver                  ", "2d                    ", &
+        "Diff                  ", "2d                    "  &
       /), shape(importFieldNames), order=(/2,1/))
   
   integer, parameter :: exportFieldCount = 24
@@ -83,6 +87,29 @@ module ipeCap
   !-----------------------------------------------------------------------------
   contains
   !-----------------------------------------------------------------------------
+
+  subroutine CopyImported2DField(field, target, rc)
+    type(ESMF_Field), intent(in) :: field
+    real(prec), intent(inout) :: target(:,:)
+    integer, intent(out) :: rc
+
+    real(ESMF_KIND_R8), pointer :: fieldPtr2d(:,:)
+    integer :: istr, iend, jstr, jend
+
+    rc = ESMF_SUCCESS
+    nullify(fieldPtr2d)
+
+    call ESMF_FieldGet(field, farrayPtr=fieldPtr2d, rc=rc)
+    if (rc /= ESMF_SUCCESS) return
+
+    istr = lbound(fieldPtr2d, dim=1)
+    iend = ubound(fieldPtr2d, dim=1)
+    jstr = lbound(fieldPtr2d, dim=2)
+    jend = ubound(fieldPtr2d, dim=2)
+
+    target(istr:iend, jstr:jend) = fieldPtr2d(istr:iend, jstr:jend)
+
+  end subroutine CopyImported2DField
 
   subroutine SetTestCond(name, field, ptr2d, rc)
     character(len=*), intent(in) :: name
@@ -379,6 +406,10 @@ module ipeCap
       return  ! bail out
     ! initialize internal state
     nullify(is % model % nodeToIndexMap)
+    nullify(is % model % rim_jfac)
+    nullify(is % model % rim_epot)
+    nullify(is % model % rim_aver)
+    nullify(is % model % rim_diff)
 
     ipe => is % model % ipe
 
@@ -422,6 +453,21 @@ module ipeCap
         line=__LINE__, &
         file=__FILE__)) &
         return  ! bail out
+
+      allocate(is % model % rim_jfac(kmlonp1, kmlat), &
+               is % model % rim_epot(kmlonp1, kmlat), &
+               is % model % rim_aver(kmlonp1, kmlat), &
+               is % model % rim_diff(kmlonp1, kmlat), stat=stat)
+      if (ESMF_LogFoundAllocError(statusToCheck=stat, msg=ESMF_LOGERR_PASSTHRU, &
+        line=__LINE__,  &
+        file=__FILE__,  &
+        rcToReturn=rc)) &
+        return  ! bail out
+
+      is % model % rim_jfac = 0.0_prec
+      is % model % rim_epot = 0.0_prec
+      is % model % rim_aver = 0.0_prec
+      is % model % rim_diff = 0.0_prec
     end if
 
     ! realize connected Fields in the importState
@@ -775,15 +821,6 @@ module ipeCap
       numLocalNodes = size(this % nodeToIndexMap, 1)
 
       do item = 1, size(fieldList)
-        ! --- get field data
-        nullify(fieldPtr)
-        call ESMF_FieldGet(fieldList(item), farrayPtr=fieldPtr, rc=rc)
-        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
-          line=__LINE__,  &
-          file=__FILE__)) &
-          return  ! bail out
-
-        ! -- identify IPE neutral array receiving imported field data
         nullify(modelPtr3d)
         select case (trim(standardNameList(item)))
           case ("temp_neutral")
@@ -800,17 +837,43 @@ module ipeCap
             modelPtr3d(kps:,lps:,mps:) => ipe % neutrals % molecular_oxygen
           case ("N2_Density")
             modelPtr3d(kps:,lps:,mps:) => ipe % neutrals % molecular_nitrogen
-          case default
-            ! -- unavailable neutrals array, skip it
-            cycle
         end select
 
-        do id = 1, numLocalNodes
-          kp = this % nodeToIndexMap(id, 1)
-          lp = this % nodeToIndexMap(id, 2)
-          mp = this % nodeToIndexMap(id, 3)
-          modelPtr3d(kp, lp, mp) = fieldPtr(id)
-        end do
+        if (associated(modelPtr3d)) then
+          ! Existing WAM->IPE mesh imports remain 1-D fields.
+          nullify(fieldPtr)
+          call ESMF_FieldGet(fieldList(item), farrayPtr=fieldPtr, rc=rc)
+          if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__,  &
+            file=__FILE__)) &
+            return  ! bail out
+
+          do id = 1, numLocalNodes
+            kp = this % nodeToIndexMap(id, 1)
+            lp = this % nodeToIndexMap(id, 2)
+            mp = this % nodeToIndexMap(id, 3)
+            modelPtr3d(kp, lp, mp) = fieldPtr(id)
+          end do
+        else
+          ! RIM->IPE fields are 2-D grid fields. Import and retain them, but
+          ! do not yet modify the active IPE electrodynamics solve.
+          select case (trim(standardNameList(item)))            
+            case ("jFac")
+              call CopyImported2DField(fieldList(item), this % rim_jfac, rc)
+            case ("Epot")
+              call CopyImported2DField(fieldList(item), this % rim_epot, rc)
+            case ("Aver")
+              call CopyImported2DField(fieldList(item), this % rim_aver, rc)
+            case ("Diff")
+              call CopyImported2DField(fieldList(item), this % rim_diff, rc)
+            case default
+              cycle
+          end select
+          if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__,  &
+            file=__FILE__)) &
+            return  ! bail out
+        end if
 
         ! -- write import fields
         if (ipe % parameters % import_write > 0) then
@@ -1116,6 +1179,43 @@ module ipeCap
         rcToReturn=rc)) &
         return  ! bail out
       nullify(this % nodeToIndexMap)
+    end if
+
+    if (associated(this % rim_jfac)) then
+      deallocate(this % rim_jfac, stat=stat)
+      if (ESMF_LogFoundDeallocError(statusToCheck=stat, msg=ESMF_LOGERR_PASSTHRU, &
+        line=__LINE__,  &
+        file=__FILE__,  &
+        rcToReturn=rc)) &
+        return  ! bail out
+      nullify(this % rim_jfac)
+    end if
+    if (associated(this % rim_epot)) then
+      deallocate(this % rim_epot, stat=stat)
+      if (ESMF_LogFoundDeallocError(statusToCheck=stat, msg=ESMF_LOGERR_PASSTHRU, &
+        line=__LINE__,  &
+        file=__FILE__,  &
+        rcToReturn=rc)) &
+        return  ! bail out
+      nullify(this % rim_epot)
+    end if
+    if (associated(this % rim_aver)) then
+      deallocate(this % rim_aver, stat=stat)
+      if (ESMF_LogFoundDeallocError(statusToCheck=stat, msg=ESMF_LOGERR_PASSTHRU, &
+        line=__LINE__,  &
+        file=__FILE__,  &
+        rcToReturn=rc)) &
+        return  ! bail out
+      nullify(this % rim_aver)
+    end if
+    if (associated(this % rim_diff)) then
+      deallocate(this % rim_diff, stat=stat)
+      if (ESMF_LogFoundDeallocError(statusToCheck=stat, msg=ESMF_LOGERR_PASSTHRU, &
+        line=__LINE__,  &
+        file=__FILE__,  &
+        rcToReturn=rc)) &
+        return  ! bail out
+      nullify(this % rim_diff)
     end if
 
     ! extro

@@ -4,6 +4,7 @@ module ipeMethods
   use NUOPC
   use IPE_Wrapper
   use IPE_Constants_Dictionary
+  use params_module, only: kmlonp1, kmlat
 
   implicit none
 
@@ -13,6 +14,10 @@ module ipeMethods
   type IPE_Model_Type
     integer,          pointer :: nodeToIndexMap(:,:)
     type (IPE_Model), pointer :: ipe
+    real(prec),       pointer :: rim_jfac(:,:)
+    real(prec),       pointer :: rim_epot(:,:)
+    real(prec),       pointer :: rim_aver(:,:)
+    real(prec),       pointer :: rim_diff(:,:)
   end type
 
   type IPE_InternalState_Type
