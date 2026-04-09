@@ -73,6 +73,8 @@ module ipeCap
         "hall_conductance      ", "2d                    ", &
         "pedersen_conductance  ", "2d                    "  &
       /), shape(exportFieldNames), order=(/2,1/))
+      
+  logical :: UseTestCond = .false.
   
   private
 
@@ -81,6 +83,59 @@ module ipeCap
   !-----------------------------------------------------------------------------
   contains
   !-----------------------------------------------------------------------------
+
+  subroutine SetTestCond(name, field, ptr2d, rc)
+    character(len=*), intent(in) :: name
+    type(ESMF_Field), intent(in) :: field
+    real(ESMF_KIND_R8), pointer, intent(inout) :: ptr2d(:,:)
+    integer, intent(out) :: rc
+
+    type(ESMF_Grid) :: grid
+    integer :: i, j
+    integer :: istr, iend, jstr, jend
+    real(ESMF_KIND_R8) :: Val0, Lon, Lat
+    real(ESMF_KIND_R8), pointer :: Lon_I(:), Lat_I(:)
+    real(ESMF_KIND_R8), parameter :: Hall0 = 3.0_ESMF_KIND_R8
+    real(ESMF_KIND_R8), parameter :: Ped0  = 5.0_ESMF_KIND_R8
+    real(ESMF_KIND_R8), parameter :: Coef  = 1.0e-5_ESMF_KIND_R8
+
+    rc = ESMF_SUCCESS
+
+    select case (trim(name))
+    case ("hall_conductance")
+      Val0 = Hall0
+    case ("pedersen_conductance")
+      Val0 = Ped0
+    case default
+      return
+    end select
+
+    istr = lbound(ptr2d, dim=1)
+    iend = ubound(ptr2d, dim=1)
+    jstr = lbound(ptr2d, dim=2)
+    jend = ubound(ptr2d, dim=2)
+
+    nullify(Lon_I, Lat_I)
+    call ESMF_FieldGet(field, grid=grid, rc=rc)
+    if (rc /= ESMF_SUCCESS) return
+
+    call ESMF_GridGetCoord(grid, coordDim=1, staggerLoc=ESMF_STAGGERLOC_CORNER, &
+      farrayPtr=Lon_I, rc=rc)
+    if (rc /= ESMF_SUCCESS) return
+
+    call ESMF_GridGetCoord(grid, coordDim=2, staggerLoc=ESMF_STAGGERLOC_CORNER, &
+      farrayPtr=Lat_I, rc=rc)
+    if (rc /= ESMF_SUCCESS) return
+
+    do j = jstr, jend
+      Lat = Lat_I(j)
+      do i = istr, iend
+        Lon = Lon_I(i)
+        ptr2d(i,j) = Val0 + Coef * abs(Lon) * (90.0_ESMF_KIND_R8 - abs(Lat))
+      end do
+    end do
+
+  end subroutine SetTestCond
 
   subroutine SetServices(gcomp, rc)
     type(ESMF_GridComp)  :: gcomp
@@ -535,16 +590,20 @@ module ipeCap
             file=__FILE__)) &
             return  ! bail out
 
-          istr = lbound(fieldPtr2d, dim=1)
-          iend = ubound(fieldPtr2d, dim=1)
-          jstr = lbound(fieldPtr2d, dim=2)
-          jend = ubound(fieldPtr2d, dim=2)
+          if (UseTestCond) then
+             call SetTestCond(trim(itemNameList(item)), field, fieldPtr2d, rc)
+          else
+             istr = lbound(fieldPtr2d, dim=1)
+             iend = ubound(fieldPtr2d, dim=1)
+             jstr = lbound(fieldPtr2d, dim=2)
+             jend = ubound(fieldPtr2d, dim=2)
 
-          do j = jstr, jend
-             do i = istr, iend
-                fieldPtr2d(i,j) = modelPtr2d(i,j)                
+             do j = jstr, jend
+                do i = istr, iend
+                   fieldPtr2d(i,j) = modelPtr2d(i,j)
+                end do
              end do
-          end do
+          end if
        end if
 
        call NUOPC_SetAttribute(field, name="Updated", value="true", rc=rc)
@@ -926,16 +985,20 @@ module ipeCap
             file=__FILE__)) &
             return  ! bail out
 
-          ! --- fill field data
-          istr = lbound(fieldPtr2d, dim=1)
-          iend = ubound(fieldPtr2d, dim=1)
-          jstr = lbound(fieldPtr2d, dim=2)
-          jend = ubound(fieldPtr2d, dim=2)
-          do j = jstr, jend
-            do i = istr, iend
-              fieldPtr2d(i,j) = modelPtr2d(i,j)
+          if (UseTestCond) then
+            call SetTestCond(trim(standardNameList(item)), fieldList(item), fieldPtr2d, rc)
+          else
+            ! --- fill field data
+            istr = lbound(fieldPtr2d, dim=1)
+            iend = ubound(fieldPtr2d, dim=1)
+            jstr = lbound(fieldPtr2d, dim=2)
+            jend = ubound(fieldPtr2d, dim=2)
+            do j = jstr, jend
+              do i = istr, iend
+                fieldPtr2d(i,j) = modelPtr2d(i,j)
+              end do
             end do
-          end do
+          end if
 
           ! -- write export fields
           if (ipe % parameters % export_write > 0) then
