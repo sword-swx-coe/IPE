@@ -429,9 +429,15 @@ module ipeCap
     ! local variables
     type(ESMF_Field) :: field
     type(ESMF_State) :: exportState
+    type(ESMF_Clock) :: clock
+    type(IPE_InternalState_Type)  :: is
+    type(IPE_Model),      pointer :: ipe
     integer :: verbosity, item, itemCount
+    integer :: i, j, istr, iend, jstr, jend
     character(len=ESMF_MAXSTR) :: name
     character(ESMF_MAXSTR), allocatable :: itemNameList(:)
+    real(ESMF_KIND_R8), dimension(:,:), pointer :: fieldPtr2d
+    real(prec),         dimension(:,:), pointer :: modelPtr2d
 
     ! local parameters
     character(len=*), parameter :: rName = "DataInitialize"
@@ -448,6 +454,12 @@ module ipeCap
 
     ! Get export state
     call NUOPC_ModelGet(gcomp, exportState=exportState, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__,  &
+      file=__FILE__)) &
+      return  ! bail out
+
+    call ESMF_GridCompGet(gcomp, clock=clock, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
       line=__LINE__,  &
       file=__FILE__)) &
@@ -477,6 +489,29 @@ module ipeCap
       file=__FILE__)) &
       return  ! bail out
 
+    nullify(ipe)
+    call ESMF_GridCompGetInternalState(gcomp, is, rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__,  &
+      file=__FILE__)) &
+      return  ! bail out
+    ipe => is % model % ipe
+
+    if (.not.associated(ipe)) then
+      call ESMF_LogSetError(ESMF_RC_PTR_NOTALLOC, &
+        msg="IPE model unavailable", &
+        line=__LINE__,  &
+        file=__FILE__,  &
+        rcToReturn=rc)
+      return  ! bail out
+    end if
+
+    call Refresh_IPE_Electrodynamics(ipe, clock, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__,  &
+      file=__FILE__)) &
+      return  ! bail out
+
     ! Loop over fields and mark them updated
     do item = 1, itemCount
        call ESMF_StateGet(exportState, itemName=trim(itemNameList(item)), field=field, rc=rc)
@@ -484,6 +519,33 @@ module ipeCap
          line=__LINE__,  &
          file=__FILE__)) &
          return  ! bail out
+
+       nullify(modelPtr2d, fieldPtr2d)
+       select case (trim(itemNameList(item)))
+       case ("hall_conductance")
+          modelPtr2d(1:,1:) => ipe % eldyn % geomag_hall_conductivity
+       case ("pedersen_conductance")
+          modelPtr2d(1:,1:) => ipe % eldyn % geomag_pedersen_conductivity
+       end select
+
+       if (associated(modelPtr2d)) then
+          call ESMF_FieldGet(field, farrayPtr=fieldPtr2d, rc=rc)
+          if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+            line=__LINE__,  &
+            file=__FILE__)) &
+            return  ! bail out
+
+          istr = lbound(fieldPtr2d, dim=1)
+          iend = ubound(fieldPtr2d, dim=1)
+          jstr = lbound(fieldPtr2d, dim=2)
+          jend = ubound(fieldPtr2d, dim=2)
+
+          do j = jstr, jend
+             do i = istr, iend
+                fieldPtr2d(i,j) = modelPtr2d(i,j)                
+             end do
+          end do
+       end if
 
        call NUOPC_SetAttribute(field, name="Updated", value="true", rc=rc)
        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &

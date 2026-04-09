@@ -13,6 +13,7 @@ MODULE IPE_Wrapper
 
   PUBLIC :: Initialize_IPE
   PUBLIC :: Update_IPE
+  PUBLIC :: Refresh_IPE_Electrodynamics
   PUBLIC :: Finalize_IPE
 
 CONTAINS
@@ -166,6 +167,62 @@ CONTAINS
     ENDIF
 
   END SUBROUTINE Update_IPE
+
+  ! Recompute only the electrodynamics state for the current model time.
+  ! This is used during initialization to populate conductance-related
+  ! exports without running the full IPE advance, which would also update
+  ! neutrals, plasma, and increment the internal IPE clock.
+  SUBROUTINE Refresh_IPE_Electrodynamics( ipe, clock, rc )
+
+    TYPE(IPE_Model)                :: ipe
+    TYPE(ESMF_Clock)               :: clock
+    INTEGER, OPTIONAL, INTENT(OUT) :: rc
+
+    TYPE(ESMF_Time)         :: currTime, startTime
+    INTEGER                 :: localrc
+
+    IF (PRESENT(rc)) rc = ESMF_SUCCESS
+
+    CALL ESMF_ClockGet(clock, startTime=startTime, currTime=currTime, rc=localrc)
+    IF( ESMF_LogFoundError(rcToCheck=localrc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      FILE=__FILE__, &
+      rcToReturn=rc) ) RETURN  ! bail out
+
+    CALL IPE_SetClock( ipe, currTime, startTime, localrc )
+    IF( ESMF_LogFoundError(rcToCheck=localrc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, &
+      FILE=__FILE__, &
+      rcToReturn=rc) ) RETURN  ! bail out
+
+    CALL ipe % forcing % Update_Current_Index( ipe % parameters, &
+      ipe % time_tracker % elapsed_sec, rc=localrc )
+    IF( localrc /= IPE_SUCCESS ) THEN
+      CALL ESMF_LogSetError(ESMF_RC_INTNRL_BAD, msg="Error updating IPE forcing index", &
+        line=__LINE__, &
+        file=__FILE__, &
+        rcToReturn=rc)
+      RETURN
+    ENDIF
+
+    CALL ipe % eldyn % Update( ipe % grid, &
+                               ipe % forcing, &
+                               ipe % time_tracker, &
+                               ipe % plasma, &
+                               ipe % parameters % offset1_deg, &
+                               ipe % parameters % offset2_deg, &
+                               ipe % parameters % potential_model, &
+                               ipe % mpi_layer, &
+                               rc=localrc )
+    IF( localrc /= IPE_SUCCESS ) THEN
+      CALL ESMF_LogSetError(ESMF_RC_INTNRL_BAD, msg="Error refreshing IPE electrodynamics", &
+        line=__LINE__, &
+        file=__FILE__, &
+        rcToReturn=rc)
+      RETURN
+    ENDIF
+
+  END SUBROUTINE Refresh_IPE_Electrodynamics
 
   
   SUBROUTINE Finalize_IPE( ipe, rc )
