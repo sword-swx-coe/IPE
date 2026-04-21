@@ -16,9 +16,9 @@ MODULE IPE_Model_Class
 
   USE COMIO
 
-
+  use ModMile
+  
   IMPLICIT NONE
-
 
   ! The IPE_Model serves as a wrapper for all of the underlying attributes.
   ! This class should be used to orchestrate model setup, updating, and
@@ -27,78 +27,78 @@ MODULE IPE_Model_Class
 
   TYPE IPE_Model
 
-    TYPE( IPE_Time )              :: time_tracker
-    TYPE( IPE_Model_Parameters )  :: parameters
-    TYPE( IPE_Grid )              :: grid
-    TYPE( IPE_Forcing )           :: forcing
-    TYPE( IPE_Neutrals )          :: neutrals
-    TYPE( IPE_Plasma )            :: plasma
-    TYPE( IPE_Electrodynamics )   :: eldyn
-    TYPE( IPE_MPI_Layer )         :: mpi_layer
-    CLASS( COMIO_T ), ALLOCATABLE :: io
+     TYPE( IPE_Time )              :: time_tracker
+     TYPE( IPE_Model_Parameters )  :: parameters
+     TYPE( IPE_Grid )              :: grid
+     TYPE( IPE_Forcing )           :: forcing
+     TYPE( IPE_Neutrals )          :: neutrals
+     TYPE( IPE_Plasma )            :: plasma
+     TYPE( IPE_Electrodynamics )   :: eldyn
+     TYPE( IPE_MPI_Layer )         :: mpi_layer
+     CLASS( COMIO_T ), ALLOCATABLE :: io
 
-    CONTAINS
+   CONTAINS
 
-      PROCEDURE :: Build => Build_IPE_Model
-      PROCEDURE :: Trash => Trash_IPE_Model
+     PROCEDURE :: Build => Build_IPE_Model
+     PROCEDURE :: Trash => Trash_IPE_Model
 
-      PROCEDURE :: Update     => Update_IPE_Model
-      PROCEDURE :: Initialize => Initialize_IPE_Model
-      PROCEDURE :: Write      => Write_IPE_State
-      PROCEDURE :: Read       => Read_IPE_State
+     PROCEDURE :: Update     => Update_IPE_Model
+     PROCEDURE :: Initialize => Initialize_IPE_Model
+     PROCEDURE :: Write      => Write_IPE_State
+     PROCEDURE :: Read       => Read_IPE_State
 
   END TYPE IPE_Model
 
-
   INTEGER, PARAMETER :: num_ion_densities = 9
   CHARACTER(LEN=*), DIMENSION(num_ion_densities), PARAMETER :: ion_densities = &
-      (/ &
-        "o_plus_density   ", &
-        "h_plus_density   ", &
-        "he_plus_density  ", &
-        "n_plus_density   ", &
-        "no_plus_density  ", &
-        "o2_plus_density  ", &
-        "n2_plus_density  ", &
-        "o_plus_2D_density", &
-        "o_plus_2P_density"  &
-      /)
+       (/ &
+       "o_plus_density   ", &
+       "h_plus_density   ", &
+       "he_plus_density  ", &
+       "n_plus_density   ", &
+       "no_plus_density  ", &
+       "o2_plus_density  ", &
+       "n2_plus_density  ", &
+       "o_plus_2D_density", &
+       "o_plus_2P_density"  &
+       /)
 
   INTEGER, PARAMETER :: num_ion_velocities = 3
   CHARACTER(LEN=*), DIMENSION(num_ion_velocities), PARAMETER :: ion_velocities = &
-      (/ &
-        "o_plus_velocity ", &
-        "h_plus_velocity ", &
-        "he_plus_velocity"  &
-      /)
+       (/ &
+       "o_plus_velocity ", &
+       "h_plus_velocity ", &
+       "he_plus_velocity"  &
+       /)
 
   INTEGER, PARAMETER :: num_plasma_datasets = 2
   CHARACTER(LEN=*), DIMENSION(num_plasma_datasets), PARAMETER :: plasma_datasets = &
-      (/ &
-        "ion_temperature     ", &
-        "electron_temperature"  &
-      /)
+       (/ &
+       "ion_temperature     ", &
+       "electron_temperature"  &
+       /)
 
   INTEGER, PARAMETER :: num_apex_velocities = 3
   CHARACTER(LEN=*), DIMENSION(num_apex_velocities), PARAMETER :: apex_velocities = &
-      (/ &
-        "neutral_apex1_velocity", &
-        "neutral_apex2_velocity", &
-        "neutral_apex3_velocity"  &
-      /)
-
+       (/ &
+       "neutral_apex1_velocity", &
+       "neutral_apex2_velocity", &
+       "neutral_apex3_velocity"  &
+       /)
 
   INTEGER, PARAMETER :: num_geo_datasets = 3
   CHARACTER(LEN=*), DIMENSION(num_geo_datasets), PARAMETER :: geo_datasets = &
-      (/ &
-        "neutral_geographic_velocity1", &
-        "neutral_geographic_velocity2", &
-        "neutral_geographic_velocity3"  &
-      /)
-
+       (/ &
+       "neutral_geographic_velocity1", &
+       "neutral_geographic_velocity2", &
+       "neutral_geographic_velocity3"  &
+       /)
 
 CONTAINS
 
+  ! -------------------------------------------------------------------------
+  ! -------------------------------------------------------------------------
+  
   SUBROUTINE Build_IPE_Model( ipe, comm, rc )
 
     IMPLICIT NONE
@@ -115,113 +115,128 @@ CONTAINS
     CALL ipe % mpi_layer % Initialize( comm = comm )
 
     CALL ipe % parameters % Build( ipe % mpi_layer, rc=localrc )
-    IF ( ipe_error_check( localrc, line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+    IF ( ipe_error_check( localrc, line=__LINE__, file=__FILE__, rc=rc ) ) &
+         RETURN
 
     ! Initialize I/O
     IF ( ipe % mpi_layer % enabled ) THEN
-      call COMIO_Create(ipe % io, COMIO_FMT_PNETCDF, &
-                        comm=ipe % mpi_layer % mpi_communicator, &
-                        info=ipe % mpi_layer % mpi_info, &
-                        rc=localrc)
-      IF ( ipe_error_check( localrc, &
-        msg="Failed to initialize I/O layer", &
-        line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+       call COMIO_Create(ipe % io, COMIO_FMT_PNETCDF, &
+            comm=ipe % mpi_layer % mpi_communicator, &
+            info=ipe % mpi_layer % mpi_info, &
+            rc=localrc)
+       IF ( ipe_error_check( localrc, &
+            msg="Failed to initialize I/O layer", &
+            line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
     ELSE
-      call COMIO_Create(ipe % io, COMIO_FMT_PNETCDF, &
-                        rc=localrc)
-      IF ( ipe_error_check( localrc, &
-        msg="Failed to initialize I/O layer", &
-        line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+       call COMIO_Create(ipe % io, COMIO_FMT_PNETCDF, &
+            rc=localrc)
+       IF ( ipe_error_check( localrc, &
+            msg="Failed to initialize I/O layer", &
+            line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
     END IF
 
     ! Initialize the clock
-    CALL ipe % time_tracker % Build( ipe % parameters % initial_timestamp, ipe % mpi_layer % rank_id )
+    CALL ipe % time_tracker % Build( &
+         ipe % parameters % initial_timestamp, &
+         ipe % mpi_layer % rank_id )
 
     ! ////// Forcing ////// !
 
     CALL ipe % forcing % Build( ipe % parameters, rc=localrc )
     IF ( ipe_error_check( localrc, msg="Failed to initialize model forcing", &
-      line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+         line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
     ! ////// grid ////// !
 
-    CALL ipe % grid % Build( ipe % io, ipe % mpi_layer, ipe % parameters, rc=localrc )
+    CALL ipe % grid % Build( &
+         ipe % io, &
+         ipe % mpi_layer, &
+         ipe % parameters, &
+         rc=localrc )
     IF ( ipe_error_check( localrc, msg="Failed to initialize model grid", &
-      line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+         line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
     ! ////// neutrals ////// !
 
-    CALL ipe % neutrals % Build( nFluxtube = ipe % grid % nFluxTube, &
-                                 NLP       = ipe % grid % NLP, &
-                                 NMP       = ipe % grid % NMP, &
-                                 mp_low    = ipe % mpi_layer % mp_low, &
-                                 mp_high   = ipe % mpi_layer % mp_high, &
-                                 rc        = localrc )
+    CALL ipe % neutrals % Build( &
+         nFluxtube = ipe % grid % nFluxTube, &
+         NLP = ipe % grid % NLP, &
+         NMP = ipe % grid % NMP, &
+         mp_low = ipe % mpi_layer % mp_low, &
+         mp_high = ipe % mpi_layer % mp_high, &
+         rc = localrc )
     IF ( ipe_error_check( localrc, msg="Failed to initialize neutrals", &
-      line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+         line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
     ! ////// electric field /////// !
 
-    CALL ipe % eldyn % Build( nFluxTube = ipe % grid % nFluxTube,&
-                              NLP       = ipe % grid % NLP, &
-                              NMP       = ipe % grid % NMP, &
-                              dynamo    = ipe % parameters % dynamo_efield, &
-                              mp_low    = ipe % mpi_layer % mp_low, &
-                              mp_high   = ipe % mpi_layer % mp_high, &
-                              halo      = ipe % mpi_layer % mp_halo_size, &
-                              rc        = localrc )
-    IF ( ipe_error_check( localrc, msg="Failed to initialize electrodynamics", &
-      line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
-
+    CALL ipe % eldyn % Build( &
+         nFluxTube = ipe % grid % nFluxTube,&
+         NLP = ipe % grid % NLP, &
+         NMP = ipe % grid % NMP, &
+         dynamo = ipe % parameters % dynamo_efield, &
+         mp_low = ipe % mpi_layer % mp_low, &
+         mp_high = ipe % mpi_layer % mp_high, &
+         halo = ipe % mpi_layer % mp_halo_size, &
+         parameters = ipe % parameters, &
+         rc = localrc )
+    IF ( ipe_error_check( localrc, &
+         msg="Failed to initialize electrodynamics", &
+         line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
     ! ////// plasma ////// !
 
-    CALL ipe % plasma % Build( nFluxTube = ipe % grid % nFluxTube, &
-                               NLP       = ipe % grid % NLP, &
-                               NMP       = ipe % grid % NMP, &
-                               mp_low    = ipe % mpi_layer % mp_low, &
-                               mp_high   = ipe % mpi_layer % mp_high, &
-                               halo      = ipe % mpi_layer % mp_halo_size, &
-                               rc        = localrc )
+    CALL ipe % plasma % Build( &
+         nFluxTube = ipe % grid % nFluxTube, &
+         NLP       = ipe % grid % NLP, &
+         NMP       = ipe % grid % NMP, &
+         mp_low    = ipe % mpi_layer % mp_low, &
+         mp_high   = ipe % mpi_layer % mp_high, &
+         halo      = ipe % mpi_layer % mp_halo_size, &
+         rc        = localrc )
     IF ( ipe_error_check( localrc, msg="Failed to initialize plasma", &
-      line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+         line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
   END SUBROUTINE Build_IPE_Model
 
+  ! -------------------------------------------------------------------------
+  ! -------------------------------------------------------------------------
 
   SUBROUTINE Trash_IPE_Model( ipe, rc )
 
     IMPLICIT NONE
-
+    
     CLASS( IPE_Model ), INTENT(inout) :: ipe
     INTEGER, OPTIONAL,  INTENT(out)   :: rc
-
+    
     INTEGER :: localrc
 
     IF ( PRESENT( rc ) ) rc = IPE_SUCCESS
 
     CALL ipe % forcing  % Trash( rc=localrc )
     IF ( ipe_error_check( localrc, msg="Failed to shutdown forcing", &
-      line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+         line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
     CALL ipe % grid     % Trash( rc=localrc )
     IF ( ipe_error_check( localrc, msg="Failed to shutdown grid", &
-      line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+         line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
     CALL ipe % neutrals % Trash( rc=localrc )
     IF ( ipe_error_check( localrc, msg="Failed to shutdown neutrals", &
-      line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+         line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
     CALL ipe % plasma   % Trash( rc=localrc )
     IF ( ipe_error_check( localrc, msg="Failed to shutdown plasma", &
-      line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+         line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
     CALL ipe % eldyn    % Trash( rc=localrc )
     IF ( ipe_error_check( localrc, msg="Failed to shutdown electrodynamics", &
-      line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+         line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
-    CALL ipe % io       % Shutdown( )
+    CALL ipe % io % Shutdown( )
 
     CALL ipe % mpi_layer % Finalize( )
 
   END SUBROUTINE Trash_IPE_Model
 
+  ! -------------------------------------------------------------------------
+  ! -------------------------------------------------------------------------
 
   SUBROUTINE Update_IPE_Model( ipe, t0, t1, rc )
 
@@ -236,67 +251,87 @@ CONTAINS
 
     IF ( PRESENT( rc ) ) rc = IPE_SUCCESS
 
-    IF( PRESENT( t0 ) .AND. PRESENT(t1) )THEN
+    IF ( PRESENT( t0 ) .AND. PRESENT(t1) ) THEN
 
-      nSteps = INT((t1-t0)/ipe % parameters % time_step)
+       nSteps = INT((t1-t0)/ipe % parameters % time_step)
 
     ELSE
 
-      nSteps = 1
+       nSteps = 1
 
     ENDIF
 
     DO i = 1, nSteps
 
-      call ipe % forcing % Update_Current_Index( ipe % parameters, &
-                                                 ipe % time_tracker % elapsed_sec, &
-                                                 rc = localrc )
-      IF ( ipe_error_check( localrc, msg="Failed to update driver index", &
-        line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+#ifdef HAVE_MILE
+       if (useMile) then
+          call IEModel_ % time_ymdhms( &
+               ipe % time_tracker % year, &
+               ipe % time_tracker % month, &
+               ipe % time_tracker % day, &
+               ipe % time_tracker % hour, &
+               ipe % time_tracker % minute, &
+               0)
+       endif
+#endif
+       
+       call ipe % forcing % Update_Current_Index( &
+            ipe % parameters, &
+            ipe % time_tracker % elapsed_sec, &
+            rc = localrc )
+       IF ( ipe_error_check( &
+            localrc, msg="Failed to update driver index", &
+            line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
-      CALL ipe % neutrals % Update( ipe % parameters, &
-                                    ipe % grid, &
-                                    ipe % time_tracker, &
-                                    ipe % forcing, &
-                                    ipe % mpi_layer, &
-                                    ipe % parameters % vertical_wind_limit, &
-                                    rc = localrc )
-      IF ( ipe_error_check( localrc, msg="Failed to update neutrals", &
-        line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+       CALL ipe % neutrals % Update( &
+            ipe % parameters, &
+            ipe % grid, &
+            ipe % time_tracker, &
+            ipe % forcing, &
+            ipe % mpi_layer, &
+            ipe % parameters % vertical_wind_limit, &
+            rc = localrc )
+       IF ( ipe_error_check( localrc, msg="Failed to update neutrals", &
+            line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
-      CALL ipe % eldyn % Update( ipe % grid, &
-                                 ipe % forcing, &
-                                 ipe % time_tracker, &
-                                 ipe % plasma, &
-                                 ipe % parameters % offset1_deg, &
-                                 ipe % parameters % offset2_deg, &
-                                 ipe % parameters % potential_model, &
-                                 ipe % mpi_layer, &
-                                 rc = localrc )
-      IF ( ipe_error_check( localrc, msg="Failed to update electrodynamics", &
-        line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+       CALL ipe % eldyn % Update( &
+            ipe % grid, &
+            ipe % forcing, &
+            ipe % time_tracker, &
+            ipe % plasma, &
+            ipe % parameters % offset1_deg, &
+            ipe % parameters % offset2_deg, &
+            ipe % parameters % potential_model, &
+            ipe % mpi_layer, &
+            rc = localrc )
+       IF ( ipe_error_check( localrc, msg="Failed to update electrodynamics", &
+            line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
-      CALL ipe % plasma % Update( ipe % grid, &
-                                  ipe % neutrals, &
-                                  ipe % forcing, &
-                                  ipe % time_tracker, &
-                                  ipe % mpi_layer, &
-                                  ipe % eldyn % v_ExB_apex, &
-                                  ipe % parameters % time_step, &
-                                  ipe % parameters % colfac, &
-                                  ipe % parameters % hpeq, &
-                                  ipe % parameters % transport_highlat_lp, &
-                                  ipe % parameters % perp_transport_max_lp, &
-                                  rc = localrc )
-      IF ( ipe_error_check( localrc, msg="Failed to update plasma", &
-        line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+       CALL ipe % plasma % Update( &
+            ipe % grid, &
+            ipe % neutrals, &
+            ipe % forcing, &
+            ipe % time_tracker, &
+            ipe % mpi_layer, &
+            ipe % eldyn % v_ExB_apex, &
+            ipe % parameters % time_step, &
+            ipe % parameters % colfac, &
+            ipe % parameters % hpeq, &
+            ipe % parameters % transport_highlat_lp, &
+            ipe % parameters % perp_transport_max_lp, &
+            rc = localrc )
+       IF ( ipe_error_check( localrc, msg="Failed to update plasma", &
+            line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
-      ! Update the timer
-      CALL ipe % time_tracker % Increment( ipe % parameters % time_step )
-
+       ! Update the timer
+       CALL ipe % time_tracker % Increment( ipe % parameters % time_step )
+       
     ENDDO
 
   END SUBROUTINE Update_IPE_Model
+
+  ! -------------------------------------------------------------------------
+  ! -------------------------------------------------------------------------
 
   SUBROUTINE Initialize_IPE_Model( ipe, filename, rc )
 
@@ -313,13 +348,20 @@ CONTAINS
     IF (PRESENT(rc)) rc = IPE_SUCCESS
 
     CALL ipe % Read( filename, rc=localrc )
-    IF ( ipe_error_check( localrc, msg="Failed to read file "//filename, &
-      line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+    IF ( ipe_error_check( localrc, &
+         msg="Failed to read file " // filename, &
+         line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
-    CALL ipe % plasma % Calculate_Field_Line_Integrals( ipe % grid, ipe % neutrals, ipe % parameters % colfac, ipe % mpi_layer )
+    CALL ipe % plasma % Calculate_Field_Line_Integrals( &
+         ipe % grid, &
+         ipe % neutrals, &
+         ipe % parameters % colfac, &
+         ipe % mpi_layer )
 
   END SUBROUTINE Initialize_IPE_Model
 
+  ! -------------------------------------------------------------------------
+  ! -------------------------------------------------------------------------
 
   SUBROUTINE Read_IPE_State( ipe, filename, rc )
 
@@ -339,13 +381,17 @@ CONTAINS
     is_cold_start = .false.
         
     if (is_cold_start) then
-      call Cold_Start_Initialize(ipe, localrc)
+       call Cold_Start_Initialize(ipe, localrc)
     else
-      call Warm_Start_Initialize(ipe, filename, localrc)
+       call Warm_Start_Initialize(ipe, filename, localrc)
     endif !is_cold_start
         
     if (present(rc)) rc = localrc
+    
   END SUBROUTINE Read_IPE_State
+
+  ! -------------------------------------------------------------------------
+  ! -------------------------------------------------------------------------
 
   SUBROUTINE Cold_Start_Initialize(ipe, rc)
 
@@ -360,16 +406,8 @@ CONTAINS
     IF ( PRESENT( rc ) ) rc = IPE_FAILURE
 
     IF ( ipe % mpi_layer % rank_id == 0 ) THEN
-      PRINT*, '  initializing ipe profiles for cold start'
+       PRINT*, '  initializing ipe profiles for cold start'
     ENDIF
-
-    !!! Setup common data decomposition for datasets
-    !CALL ipe % io % domain( (/ ipe % grid % nFluxtube, ipe % grid % NLP, ipe % grid % NMP /), &
-    !  (/ 1, 1, ipe % mpi_layer % mp_low /), &
-    !  (/ ipe % grid % nFluxtube, ipe % grid % NLP, ipe % mpi_layer % mp_high - ipe % mpi_layer % mp_low + 1 /) )
-    !IF (ipe % io % err % check(msg="Failed to setup I/O data decomposition", &
-    !  file=__FILE__, line=__LINE__)) RETURN
-
 
     ! --  set up neutral datasets if requested
     !IF ( ipe % mpi_layer % rank_id == 0 ) 
@@ -379,36 +417,22 @@ CONTAINS
     END IF !( ipe % parameters % read_apex_neutrals )THEN
 
     ! (1) Set up individual datasets: plasma
-    !IF ( ipe % mpi_layer % rank_id == 0 ) 
-    !print*, 'plasma temperatures'
     call Initialize_Plasma_Temperatures(ipe)
 
-
     ! -- Ion densities
-     !IF ( ipe % mpi_layer % rank_id == 0 ) 
-    !print*, ' ion densities'
     itemLoop1: DO item = 1, num_ion_densities
       ipe % plasma % ion_densities(item,:,:,:) = 1.0E6
     END DO itemLoop1
 
     ! -- Ion velocities
-    !IF ( ipe % mpi_layer % rank_id == 0 ) 
-    !print*, ' ion velocity'
     ! Initialize ion velocities
     call Initialize_Ion_Velocities(ipe)
 
-
-    ! -- (2)Compute plasma electron density from ion densities
-    !IF ( ipe % mpi_layer % rank_id == 0 ) 
-    !print*, ' calculate Ne'
+    ! -- (2) Compute plasma electron density from ion densities
     ipe % plasma % electron_density2(:,:,:) = &
-      SUM(ipe % plasma % ion_densities(1:9, :, :, :), dim=1)
-
-
+         SUM(ipe % plasma % ion_densities(1:9, :, :, :), dim=1)
 
     ! set up neutral velocities on geographic grid, if requested
-    !IF ( ipe % mpi_layer % rank_id == 0 ) 
-    !print*, ' neutral wind geo'
     IF( ipe % parameters % read_geographic_neutrals )THEN
       itemLoop2: DO item = 1, num_geo_datasets
         ipe % neutrals % velocity_geographic(item,:,:,:) = 10.0
@@ -419,8 +443,12 @@ CONTAINS
     IF ( PRESENT( rc ) ) rc = IPE_SUCCESS
 
     IF ( ipe % mpi_layer % rank_id == 0 ) &
-         print*, 'sub-ipe_initialization for cold start finished'    
+         print*, 'sub-ipe_initialization for cold start finished'
+    
   END SUBROUTINE Cold_Start_Initialize
+
+  ! -------------------------------------------------------------------------
+  ! -------------------------------------------------------------------------
 
   subroutine Initialize_Ion_Velocities(ipe)
   
@@ -435,21 +463,22 @@ CONTAINS
         end do
   end subroutine Initialize_Ion_Velocities
 
+  ! -------------------------------------------------------------------------
+  ! -------------------------------------------------------------------------
 
   subroutine Initialize_Plasma_Temperatures(ipe)
   
     IMPLICIT NONE
   
     class(IPE_Model), intent(inout) :: ipe
-    !local
-
-!    PRINT*, 'Initializing plasma temperatures'
 
     ipe % plasma % ion_temperature(:,:,:) = 1800.0
     ipe % plasma % electron_temperature(:,:,:) = 3000.0
 
-!    PRINT*, 'Plasma temperatures initialized successfully'
   end subroutine Initialize_Plasma_Temperatures
+
+  ! -------------------------------------------------------------------------
+  ! -------------------------------------------------------------------------
 
   subroutine Initialize_Neutral_Properties(ipe)
      IMPLICIT NONE
@@ -490,6 +519,9 @@ CONTAINS
     END DO itemLoop
  
   END subroutine Initialize_Neutral_Properties !(ipe)
+
+  ! -------------------------------------------------------------------------
+  ! -------------------------------------------------------------------------
 
   SUBROUTINE Warm_Start_Initialize(ipe, filename, rc)  
 
@@ -553,7 +585,7 @@ CONTAINS
     IF ( PRESENT( rc ) ) rc = IPE_FAILURE
 
     IF( ipe % mpi_layer % rank_id == 0 )THEN
-      PRINT *, '  Reading output file : '//TRIM(filename)
+      write(*,*) '> Reading output file : '//TRIM(filename)
     ENDIF
 
     ! Open HDF5 input file
@@ -680,6 +712,8 @@ CONTAINS
     IF ( PRESENT( rc ) ) rc = IPE_SUCCESS
    END SUBROUTINE Warm_Start_Initialize !(ipe, filename, rc)  
 
+  ! -------------------------------------------------------------------------
+  ! -------------------------------------------------------------------------
 
   SUBROUTINE Write_IPE_State( ipe, rc )
 
@@ -750,7 +784,7 @@ CONTAINS
                ipe % parameters % file_extension
 
     IF( ipe % mpi_layer % rank_id == 0 )THEN
-      PRINT *, '  Writing output file : '//TRIM(filename)
+      write(*,*) '-> Writing output file : '//TRIM(filename)
     ENDIF
 
     ! Create HDF5 input file
@@ -881,6 +915,5 @@ CONTAINS
     IF ( PRESENT( rc ) ) rc = IPE_SUCCESS
 
   END SUBROUTINE Write_IPE_State
-
 
 END MODULE IPE_Model_Class
