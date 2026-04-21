@@ -77,7 +77,7 @@ def get_electrodynamics(ieDir = "ext/Electrodynamics"):
     return
 
 # ----------------------------------------------------------------------
-# clone electrodynamics library (or update it)
+# 
 # ----------------------------------------------------------------------
 
 
