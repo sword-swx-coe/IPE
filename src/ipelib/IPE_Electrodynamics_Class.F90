@@ -1,62 +1,72 @@
 MODULE IPE_Electrodynamics_Class
 
+  USE IPE_Precision
+  USE IPE_Constants_Dictionary
+  USE IPE_Common_Routines
+  USE IPE_MPI_Layer_Class
+  USE IPE_Grid_Class
+  USE IPE_Forcing_Class
+  USE IPE_Time_Class
+  USE IPE_Plasma_Class
+  USE IPE_Model_Parameters_Class
 
-USE IPE_Precision
-USE IPE_Constants_Dictionary
-USE IPE_Common_Routines
-USE IPE_MPI_Layer_Class
-USE IPE_Grid_Class
-USE IPE_Forcing_Class
-USE IPE_Time_Class
-USE IPE_Plasma_Class
+  USE efield_ipe
+  USE dynamo_module
+  USE ipe_error_module
 
-USE efield_ipe
-USE dynamo_module
-USE ipe_error_module
-
-IMPLICIT NONE
-
+  use ModMile
+  
+  IMPLICIT NONE
+  
   TYPE IPE_Electrodynamics
-    INTEGER    :: nFluxTube, NLP, NMP
-    INTEGER    :: mp_low, mp_high, mp_halo
-    REAL(prec), ALLOCATABLE :: electric_potential(:,:)
-    REAL(prec), ALLOCATABLE :: electric_potential2(:,:)
-    REAL(prec), ALLOCATABLE :: electric_field(:,:,:)
-    REAL(prec), POINTER     :: v_ExB_geographic(:,:,:,:)  ! "zonal" and "meridional" direction on the geographic grid
-    REAL(prec), ALLOCATABLE :: v_ExB_apex(:,:,:) ! "zonal" and "meridional" direction ( VEXBth, VEXBe ) on the apex grid
+     INTEGER    :: nFluxTube, NLP, NMP
+     INTEGER    :: mp_low, mp_high, mp_halo
+     REAL(prec), ALLOCATABLE :: electric_potential(:,:)
+     REAL(prec), ALLOCATABLE :: electric_potential2(:,:)
+     REAL(prec), ALLOCATABLE :: electric_field(:,:,:)
+     ! "zonal" and "meridional" direction on the geographic grid
+     REAL(prec), POINTER     :: v_ExB_geographic(:,:,:,:)
+     ! "zonal" and "meridional" direction ( VEXBth, VEXBe ) on the apex grid
+     REAL(prec), ALLOCATABLE :: v_ExB_apex(:,:,:)
 
-    REAL(prec), ALLOCATABLE, PRIVATE :: lat_interp_weights(:,:) ! Weights for interpolating from magnetic longitude to ipe longitude
-    REAL(prec), ALLOCATABLE, PRIVATE :: lon_interp_weights(:,:) ! Weights for interpolating from magnetic longitude to ipe longitude
-    INTEGER, ALLOCATABLE, PRIVATE    :: lat_interp_index(:,:) ! Weights for interpolating from magnetic longitude to ipe longitude
-    INTEGER, ALLOCATABLE, PRIVATE    :: lon_interp_index(:,:) ! Weights for interpolating from magnetic longitude to ipe longitude
+     ! Weights for interpolating from magnetic longitude to ipe longitude
+     REAL(prec), ALLOCATABLE, PRIVATE :: lat_interp_weights(:,:)
+     ! Weights for interpolating from magnetic longitude to ipe longitude
+     REAL(prec), ALLOCATABLE, PRIVATE :: lon_interp_weights(:,:)
+     ! Weights for interpolating from magnetic longitude to ipe longitude
+     INTEGER, ALLOCATABLE, PRIVATE    :: lat_interp_index(:,:)
+     ! Weights for interpolating from magnetic longitude to ipe longitude
+     INTEGER, ALLOCATABLE, PRIVATE    :: lon_interp_index(:,:) 
 
-    ! Inputs for the potential solver (on the dynamo grid)
-    REAL(prec), ALLOCATABLE :: hall_conductivity(:,:)
-    REAL(prec), ALLOCATABLE :: pedersen_conductivity(:,:)
-    REAL(prec), ALLOCATABLE :: b_parallel_conductivity(:,:)
-    REAL(prec), ALLOCATABLE :: neutral_apex_velocity(:,:,:) ! Components are apex directions
+     ! Inputs for the potential solver (on the dynamo grid)
+     REAL(prec), ALLOCATABLE :: hall_conductivity(:,:)
+     REAL(prec), ALLOCATABLE :: pedersen_conductivity(:,:)
+     REAL(prec), ALLOCATABLE :: b_parallel_conductivity(:,:)
+     ! Components are apex directions
+     REAL(prec), ALLOCATABLE :: neutral_apex_velocity(:,:,:) 
 
-    ! Geographic interpolated attributes
-    REAL(prec), ALLOCATABLE :: geo_electric_potential(:,:)
-    REAL(prec), ALLOCATABLE :: geo_v_ExB_geographic(:,:,:)    ! ExB transport velocity with geographic components
-    REAL(prec), ALLOCATABLE :: geo_hall_conductivity(:,:)
-    REAL(prec), ALLOCATABLE :: geo_pedersen_conductivity(:,:)
-    REAL(prec), ALLOCATABLE :: geo_b_parallel_conductivity(:,:)
+     ! Geographic interpolated attributes
+     REAL(prec), ALLOCATABLE :: geo_electric_potential(:,:)
+     ! ExB transport velocity with geographic components
+     REAL(prec), ALLOCATABLE :: geo_v_ExB_geographic(:,:,:)
+     REAL(prec), ALLOCATABLE :: geo_hall_conductivity(:,:)
+     REAL(prec), ALLOCATABLE :: geo_pedersen_conductivity(:,:)
+     REAL(prec), ALLOCATABLE :: geo_b_parallel_conductivity(:,:)
 
-    ! Attributes on geomagnetic grid
-    REAL(prec), POINTER :: geomag_hall_conductivity(:,:)
-    REAL(prec), POINTER :: geomag_pedersen_conductivity(:,:)
+     ! Attributes on geomagnetic grid
+     REAL(prec), POINTER :: geomag_hall_conductivity(:,:)
+     REAL(prec), POINTER :: geomag_pedersen_conductivity(:,:)
+     
+   CONTAINS
 
-    CONTAINS
-
-      PROCEDURE :: Build => Build_IPE_Electrodynamics
-      PROCEDURE :: Trash => Trash_IPE_Electrodynamics
-      PROCEDURE :: Update => Update_IPE_Electrodynamics
-      PROCEDURE, PRIVATE :: Empirical_E_Field_Wrapper
-      PROCEDURE, PRIVATE :: Dynamo_Wrapper
-      PROCEDURE, PRIVATE :: Regrid_Potential
-      PROCEDURE, PRIVATE :: Calculate_Potential_Gradient
-      PROCEDURE, PRIVATE :: Calculate_ExB_Velocity
+     PROCEDURE :: Build => Build_IPE_Electrodynamics
+     PROCEDURE :: Trash => Trash_IPE_Electrodynamics
+     PROCEDURE :: Update => Update_IPE_Electrodynamics
+     PROCEDURE, PRIVATE :: Empirical_E_Field_Wrapper
+     PROCEDURE, PRIVATE :: Dynamo_Wrapper
+     PROCEDURE, PRIVATE :: Regrid_Potential
+     PROCEDURE, PRIVATE :: Calculate_Potential_Gradient
+     PROCEDURE, PRIVATE :: Calculate_ExB_Velocity
 
   END TYPE IPE_Electrodynamics
 
@@ -66,98 +76,164 @@ IMPLICIT NONE
 
 CONTAINS
 
-
-  SUBROUTINE Build_IPE_Electrodynamics( eldyn, nFluxTube, NLP, NMP, dynamo, mp_low, mp_high, halo, rc )
+  SUBROUTINE Build_IPE_Electrodynamics( &
+       eldyn, nFluxTube, NLP, NMP, dynamo, mp_low, mp_high, halo, parameters, rc )
+    
     IMPLICIT NONE
-    CLASS( IPE_Electrodynamics ), INTENT(out) :: eldyn
-    INTEGER,                      INTENT(in)  :: nFluxTube
-    INTEGER,                      INTENT(in)  :: NLP
-    INTEGER,                      INTENT(in)  :: NMP
-    LOGICAL,                      INTENT(IN)  :: dynamo
-    INTEGER,                      INTENT(in)  :: mp_low, mp_high, halo
-    INTEGER, OPTIONAL,            INTENT(out) :: rc
-    ! Local
-    INTEGER :: j, localrc, stat
-    REAL(prec) :: theta130_rad
 
+    CLASS( IPE_Electrodynamics ), INTENT(out) :: eldyn
+    INTEGER, INTENT(in) :: nFluxTube
+    INTEGER, INTENT(in) :: NLP
+    INTEGER, INTENT(in) :: NMP
+    LOGICAL, INTENT(in) :: dynamo
+    INTEGER, INTENT(in) :: mp_low, mp_high, halo
+    TYPE( IPE_Model_Parameters ), intent(in) :: parameters
+    INTEGER, OPTIONAL, INTENT(out) :: rc
+
+    ! Local
+    INTEGER :: j, localrc, stat, iFile
+    REAL(prec) :: theta130_rad
+    
     IF ( PRESENT( rc ) ) rc = IPE_SUCCESS
 
-      eldyn % nFluxTube = nFluxTube
-      eldyn % NLP       = NLP
-      eldyn % NMP       = NMP
-      eldyn % mp_low    = mp_low
-      eldyn % mp_high   = mp_high
-      eldyn % mp_halo   = halo
+    eldyn % nFluxTube = nFluxTube
+    eldyn % NLP = NLP
+    eldyn % NMP = NMP
+    eldyn % mp_low = mp_low
+    eldyn % mp_high = mp_high
+    eldyn % mp_halo = halo
 
+    ALLOCATE( &
+         eldyn % electric_potential(1:NLP,mp_low-halo:mp_high+halo), &
+         eldyn % electric_potential2(1:NLP,mp_low-halo:mp_high+halo), &
+         eldyn % electric_field(1:2,1:NLP,mp_low:mp_high), &
+         eldyn % v_ExB_geographic(1:3,1:nFluxTube,1:NLP,mp_low:mp_high), &
+         eldyn % v_ExB_apex(1:3,1:NLP,mp_low:mp_high), &
+         eldyn % hall_conductivity(1:NLP,mp_low:mp_high), &
+         eldyn % pedersen_conductivity(1:NLP,mp_low:mp_high), &
+         eldyn % b_parallel_conductivity(1:NLP,mp_low:mp_high), &
+         eldyn % neutral_apex_velocity(1:3,1:NLP,mp_low:mp_high), &
+         eldyn % lat_interp_weights(1:2,1:NLP), &
+         eldyn % lon_interp_weights(1:2,mp_low-halo:mp_high+halo), &
+         eldyn % lat_interp_index(1:2,1:NLP), &
+         eldyn % lon_interp_index(1:2,mp_low-halo:mp_high+halo), stat=stat )
+    IF ( ipe_alloc_check( stat, msg="Unable to allocate internal arrays", &
+         line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
-      ALLOCATE( eldyn % electric_potential(1:NLP,mp_low-halo:mp_high+halo), &
-                eldyn % electric_potential2(1:NLP,mp_low-halo:mp_high+halo), &
-                eldyn % electric_field(1:2,1:NLP,mp_low:mp_high), &
-                eldyn % v_ExB_geographic(1:3,1:nFluxTube,1:NLP,mp_low:mp_high), &
-                eldyn % v_ExB_apex(1:3,1:NLP,mp_low:mp_high), &
-                eldyn % hall_conductivity(1:NLP,mp_low:mp_high), &
-                eldyn % pedersen_conductivity(1:NLP,mp_low:mp_high), &
-                eldyn % b_parallel_conductivity(1:NLP,mp_low:mp_high), &
-                eldyn % neutral_apex_velocity(1:3,1:NLP,mp_low:mp_high), &
-                eldyn % lat_interp_weights(1:2,1:NLP), &
-                eldyn % lon_interp_weights(1:2,mp_low-halo:mp_high+halo), &
-                eldyn % lat_interp_index(1:2,1:NLP), &
-                eldyn % lon_interp_index(1:2,mp_low-halo:mp_high+halo), stat=stat )
-      IF ( ipe_alloc_check( stat, msg="Unable to allocate internal arrays", &
-        line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+    eldyn % electric_potential = 0.0_prec
+    eldyn % electric_potential2 = 0.0_prec
+    eldyn % electric_field = 0.0_prec
+    eldyn % v_ExB_geographic = 0.0_prec
+    eldyn % v_ExB_apex = 0.0_prec
+    eldyn % hall_conductivity = 0.0_prec
+    eldyn % pedersen_conductivity = 0.0_prec
+    eldyn % b_parallel_conductivity = 0.0_prec
+    eldyn % neutral_apex_velocity = 0.0_prec
+    eldyn % lat_interp_weights = 0.0_prec
+    eldyn % lon_interp_weights = 0.0_prec
+    eldyn % lat_interp_index = 0
+    eldyn % lon_interp_index = 0
 
-      eldyn % electric_potential      = 0.0_prec
-      eldyn % electric_potential2     = 0.0_prec
-      eldyn % electric_field          = 0.0_prec
-      eldyn % v_ExB_geographic        = 0.0_prec
-      eldyn % v_ExB_apex              = 0.0_prec
-      eldyn % hall_conductivity       = 0.0_prec
-      eldyn % pedersen_conductivity   = 0.0_prec
-      eldyn % b_parallel_conductivity = 0.0_prec
-      eldyn % neutral_apex_velocity   = 0.0_prec
-      eldyn % lat_interp_weights      = 0.0_prec
-      eldyn % lon_interp_weights      = 0.0_prec
-      eldyn % lat_interp_index        = 0
-      eldyn % lon_interp_index        = 0
+    ALLOCATE( &
+         eldyn % geo_electric_potential(1:nlon_geo,1:nlat_geo), &
+         eldyn % geo_v_ExB_geographic(1:3,1:nlon_geo,1:nlat_geo), &
+         eldyn % geo_hall_conductivity(1:nlon_geo,1:nlat_geo), &
+         eldyn % geo_pedersen_conductivity(1:nlon_geo,1:nlat_geo), &
+         eldyn % geo_b_parallel_conductivity(1:nlon_geo,1:nlat_geo), &
+         stat=stat )
+    IF ( ipe_alloc_check( stat, msg="Unable to allocate internal arrays", &
+         line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
+    ! When building the Electrodynamics data structure, we set this
+    ! module-private switch to true to ensure that the appropriate
+    ! initialization is executed for the tiegcm model.
+    !tie_gcm_init = .TRUE.
 
-      ALLOCATE( eldyn % geo_electric_potential(1:nlon_geo,1:nlat_geo), &
-                eldyn % geo_v_ExB_geographic(1:3,1:nlon_geo,1:nlat_geo), &
-                eldyn % geo_hall_conductivity(1:nlon_geo,1:nlat_geo), &
-                eldyn % geo_pedersen_conductivity(1:nlon_geo,1:nlat_geo), &
-                eldyn % geo_b_parallel_conductivity(1:nlon_geo,1:nlat_geo), &
-                stat=stat )
-      IF ( ipe_alloc_check( stat, msg="Unable to allocate internal arrays", &
-        line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
-
-      ! When building the Electrodynamics data structure, we set this
-      ! module-private switch to true to ensure that the appropriate
-      ! initialization is executed for the tiegcm model.
-      !tie_gcm_init = .TRUE.
-
-      dynamo_efield = dynamo
-      IF ( .not. dynamo ) THEN
-        CALL efield_init_ipe( rc=localrc )
-        IF ( ipe_error_check( localrc, msg="call to efield_init_ipe failed", &
-          line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
-        ! Maps latitude from 130km to 90km along flux tube.
-        DO j=0,nmlat
+    dynamo_efield = dynamo
+    IF ( .not. dynamo ) THEN
+       CALL efield_init_ipe( rc=localrc )
+       IF ( ipe_error_check( localrc, msg="call to efield_init_ipe failed", &
+            line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+       ! Maps latitude from 130km to 90km along flux tube.
+       DO j=0,nmlat
           theta130_rad   = ( 180.0_prec - ylatm(j) ) * dtr
-          theta90_rad(j) = ASIN(SIN( theta130_rad )*SQRT((earth_radius+90000.0_prec)/(earth_radius+130000.0_prec)))
+          theta90_rad(j) = ASIN( SIN(theta130_rad) * &
+               SQRT( (earth_radius+90000.0_prec) / &
+               (earth_radius+130000.0_prec)))
           IF ( theta130_rad > half_pi ) theta90_rad(j) = pi-theta90_rad(j)
-        END DO
-      END IF
+       END DO
+    END IF
 
-      ALLOCATE( eldyn % geomag_hall_conductivity(kmlonp1,kmlat), &
-                eldyn % geomag_pedersen_conductivity(kmlonp1,kmlat), &
-                stat=stat )
-      IF ( ipe_alloc_check( stat, msg="Unable to allocate internal arrays", &
-        line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+    ALLOCATE( &
+         eldyn % geomag_hall_conductivity(kmlonp1,kmlat), &
+         eldyn % geomag_pedersen_conductivity(kmlonp1,kmlat), &
+         stat=stat )
+    IF ( ipe_alloc_check( stat, msg="Unable to allocate internal arrays", &
+         line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
-      eldyn % geomag_hall_conductivity       = 0.0_prec
-      eldyn % geomag_pedersen_conductivity   = 0.0_prec
+    eldyn % geomag_hall_conductivity = 0.0_prec
+    eldyn % geomag_pedersen_conductivity = 0.0_prec
 
+    ! ------------------------------------------------------------------
+    ! MILE code -> Initializing the IE Library
+    ! ------------------------------------------------------------------
+
+#ifdef HAVE_MILE
+    
+    if (useMile) then
+
+       allocate(IEModel_, stat = stat)
+       IF ( ipe_alloc_check( stat, &
+            msg="Unable to allocate MILE IE Library!", &
+            line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+       IEModel_ = ieModel()
+
+       call IEModel_ % verbose(parameters % mile_verbose)
+       if (parameters % mile_verbose >= 0) &
+            write(*,*) '> Initializing MILE E-field / Aurora : ', &
+            trim(parameters % mile_efield), ' / ', &
+            trim(parameters % mile_aurora)
+       call IEModel_%efield_model(parameters % mile_efield)
+       call IEModel_%aurora_model(parameters % mile_aurora)
+       call IEModel_%model_dir(parameters % mile_dir)
+       call IEModel_%filename_north(parameters % amieFileNorth)
+       call IEModel_%filename_south(parameters % amieFileSouth)
+
+       ! If we have a list of files, then set them this way:
+       call IEModel_%nfiles_north(parameters % nAmieFilesNorth)
+       if (parameters % nAmieFilesNorth > 0) then
+          do iFile = 1, parameters % nAmieFilesNorth
+             call IEModel_%filename_list_north(iFile, &
+                  parameters % cAMIEListNorth(iFile))
+          enddo
+       endif
+
+       ! If we have a list of files, then set them this way:
+       call IEModel_%nfiles_south(parameters % nAmieFilesSouth)
+       if (parameters % nAmieFilesSouth > 0) then
+          do iFile = 1, parameters % nAmieFilesSouth
+             call IEModel_%filename_list_south(iFile, &
+                  parameters % cAMIEListSouth(iFile))
+          enddo
+       endif
+
+       ! Initialize the IE library after setting it up:
+       call IEModel_%init()
+    
+       ! Initialize the grid:
+       ! Include ghost cells in MLT:
+       call IEModel_%nMlts(mp_high - mp_low + 1 + 2*halo)
+       ! Include north and south:
+       call IEModel_%nLats(nlp * 2)
+
+    endif
+
+#endif
+    
   END SUBROUTINE Build_IPE_Electrodynamics
+
+  ! ------------------------------------------------------------------------
+  ! ------------------------------------------------------------------------
 
   SUBROUTINE Trash_IPE_Electrodynamics( eldyn, rc )
     IMPLICIT NONE
@@ -168,38 +244,42 @@ CONTAINS
 
     IF (PRESENT(rc)) rc = IPE_SUCCESS
 
-      DEALLOCATE( eldyn % electric_potential, &
-                  eldyn % electric_potential2, &
-                  eldyn % electric_field, &
-                  eldyn % v_ExB_geographic, &
-                  eldyn % v_ExB_apex, &
-                  eldyn % hall_conductivity, &
-                  eldyn % pedersen_conductivity, &
-                  eldyn % b_parallel_conductivity, &
-                  eldyn % neutral_apex_velocity, &
-                  eldyn % lat_interp_weights, &
-                  eldyn % lon_interp_weights, &
-                  eldyn % lat_interp_index, &
-                  eldyn % lon_interp_index, &
-                  stat=stat )
-      IF ( ipe_dealloc_check( stat, msg="Unable to deallocate internal arrays", &
-        line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+    DEALLOCATE( &
+         eldyn % electric_potential, &
+         eldyn % electric_potential2, &
+         eldyn % electric_field, &
+         eldyn % v_ExB_geographic, &
+         eldyn % v_ExB_apex, &
+         eldyn % hall_conductivity, &
+         eldyn % pedersen_conductivity, &
+         eldyn % b_parallel_conductivity, &
+         eldyn % neutral_apex_velocity, &
+         eldyn % lat_interp_weights, &
+         eldyn % lon_interp_weights, &
+         eldyn % lat_interp_index, &
+         eldyn % lon_interp_index, &
+         stat=stat )
+    IF ( ipe_dealloc_check( stat, msg="Unable to deallocate internal arrays", &
+         line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
-      DEALLOCATE( eldyn % geo_electric_potential, &
-                  eldyn % geo_v_ExB_geographic, &
-                  eldyn % geo_hall_conductivity, &
-                  eldyn % geo_pedersen_conductivity, &
-                  eldyn % geo_b_parallel_conductivity, &
-                  stat=stat )
-      IF ( ipe_dealloc_check( stat, msg="Unable to deallocate internal geo arrays", &
-        line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+    DEALLOCATE( &
+         eldyn % geo_electric_potential, &
+         eldyn % geo_v_ExB_geographic, &
+         eldyn % geo_hall_conductivity, &
+         eldyn % geo_pedersen_conductivity, &
+         eldyn % geo_b_parallel_conductivity, &
+         stat=stat )
+    IF ( ipe_dealloc_check( stat, msg="Unable to deallocate internal geo arrays", &
+         line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
   END SUBROUTINE Trash_IPE_Electrodynamics
 
-
-
-  SUBROUTINE Update_IPE_Electrodynamics( eldyn, grid, forcing, time_tracker, plasma, &
-                                         offset1_deg,offset2_deg,potential_model, mpi_layer, rc )
+  ! ------------------------------------------------------------------------
+  ! ------------------------------------------------------------------------
+  
+  SUBROUTINE Update_IPE_Electrodynamics( &
+       eldyn, grid, forcing, time_tracker, plasma, &
+       offset1_deg,offset2_deg,potential_model, mpi_layer, rc )
     IMPLICIT NONE
     CLASS( IPE_Electrodynamics ), INTENT(inout) :: eldyn
     TYPE( IPE_Grid ),             INTENT(in)    :: grid
@@ -214,12 +294,35 @@ CONTAINS
     INTEGER :: lp, mp, localrc
     REAL(prec) :: max_v_exb_local
     REAL(prec) :: max_v_exb
+
+    real :: sangle, bt, by, bz, swvel, swn
+    
 #ifdef HAVE_MPI
     INTEGER :: mpiError
 #endif
 
     IF (PRESENT(rc)) rc = IPE_SUCCESS
 
+    ! For MILE, update the drivers:
+    sangle= forcing % solarwind_angle ( forcing % current_index )
+    bt= forcing % solarwind_Bt (forcing % current_index )
+    swvel = forcing % solarwind_velocity (forcing % current_index )
+    swn = forcing % solarwind_density (forcing % current_index )
+    bz = bt * cos(sangle * 3.1415 / 180.0)
+    by = by * sin(sangle * 3.1415 / 180.0)
+    
+#ifdef HAVE_MILE
+    if (useMile) then
+       call IEModel_ % imfBz(bz)
+       call IEModel_ % imfBy(by)
+       call IEModel_ % swV(swvel)
+       call IEModel_ % swN(swn)
+       call IEModel_ % useAeHp()
+       call IEModel_ % au(25.0)
+       call IEModel_ % al(-25.0)
+    endif
+#endif
+    
     IF( dynamo_efield ) THEN
 
       CALL eldyn % Dynamo_Wrapper(grid, forcing, time_tracker, plasma, &
@@ -227,11 +330,9 @@ CONTAINS
       IF ( ipe_error_check(localrc, msg="call to Dynamo_Wrapper failed", &
         line=__LINE__, file=__FILE__, rc=rc) ) RETURN
       IF( mpi_layer % rank_id == 0 )THEN
-       write(6,*) '*********************************'
        write(6,899) time_tracker % year, time_tracker % month, time_tracker % day, &
                     time_tracker % hour, time_tracker % minute
- 899   format('Calling Dynamo E field ', i4,x,i2.2,x,i2.2,2x,i2.2,':'i2.2)
-       write(6,*) '*********************************'
+ 899   format(' -> Calling Dynamo E field ', i4,x,i2.2,x,i2.2,2x,i2.2,':',i2.2)
       ENDIF
 
     ELSE
@@ -239,9 +340,6 @@ CONTAINS
       CALL eldyn % Empirical_E_Field_Wrapper( grid, forcing, time_tracker, mpi_layer, rc=localrc )
       IF ( ipe_error_check(localrc, msg="call to Empirical_E_Field_Wrapper failed", &
         line=__LINE__, file=__FILE__, rc=rc) ) RETURN
-      IF( mpi_layer % rank_id == 0 )THEN
-        print *,'TZU-WEI calling empirical E field'
-      ENDIF
 
       ! Calculate the potential gradient in IPE coordinates.
       CALL eldyn % Calculate_Potential_Gradient( grid )
@@ -769,6 +867,8 @@ CONTAINS
     eldyn_conductivities(:,:,:,:)=0.
     ed_conductivities(:,:,:)=0.
     tube_need(:) = 0
+
+    ! This subroutine sets constants and grid things:
     CALL init_cons
 
     sangle= forcing % solarwind_angle ( forcing % current_index )
@@ -782,7 +882,8 @@ CONTAINS
     year=2000
 
     CALL sunloc( year, time_tracker % day_of_year, time_tracker % utime, sunlons, localrc )
-    IF ( ipe_error_check( localrc, msg="call to sunloc failed", line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+    IF ( ipe_error_check( localrc, msg="call to sunloc failed", &
+         line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
     DO i = 1, grid % NLP
       mlat_plas  = 90. - grid % magnetic_colatitude(1,i)*rtd
@@ -879,11 +980,11 @@ CONTAINS
 
 !
 !nm20250620 Output conductance
-    IF( mpi_layer % rank_id == 0 )THEN
+    IF( mpi_layer % rank_id == -100 )THEN
       !print*,'*********************************'
       write(6,898) time_tracker % year, time_tracker % month, time_tracker % day, &
                     time_tracker % hour, time_tracker % minute
- 898  format('*****output conductance zigm: ', i4,x,i2.2,x,i2.2,2x,i2.2,':'i2.2)
+ 898  format('*****output conductance zigm: ', i4,x,i2.2,x,i2.2,2x,i2.2,':',i2.2)
       print*,'(26)zigm11: min=',MINVAL(zigm11),' max=',MAXVAL(zigm11)
       print*,'(26)zigm2: min=',MINVAL(zigm2),' max=',MAXVAL(zigm2)
       mlat0: do j=1,kmlat
