@@ -380,6 +380,8 @@ CONTAINS
 
   SUBROUTINE Read_Tiros_IPE_Forcing( forcing, rc )
 
+    use ModMile
+    
     IMPLICIT NONE
 
     CLASS( IPE_Forcing ), INTENT(inout) :: forcing
@@ -387,11 +389,11 @@ CONTAINS
 
     ! Local
     INTEGER :: fUnit, iBand, irec, iostat
-    CHARACTER(LEN=*), PARAMETER :: ion_filename     = "./ionprof"
-    CHARACTER(LEN=*), PARAMETER :: spectra_filename = "./tiros_spectra"
+    CHARACTER(LEN=*), PARAMETER :: ion_filename = "ionprof"
+    CHARACTER(LEN=*), PARAMETER :: spectra_filename = "tiros_spectra"
 
     OPEN( UNIT = NewUnit(fUnit), &
-          FILE = ion_filename, &
+          FILE = trim(dataDir) // trim(ion_filename), &
           FORM = 'FORMATTED', &
           STATUS = 'OLD', &
           ACTION = 'READ',&
@@ -412,7 +414,7 @@ CONTAINS
       line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
     OPEN( UNIT = NewUnit(fUnit), &
-          FILE = spectra_filename, &
+          FILE = trim(dataDir) // trim(spectra_filename), &
           FORM = 'FORMATTED', &
           STATUS = 'OLD', &
           ACTION = 'READ',&
