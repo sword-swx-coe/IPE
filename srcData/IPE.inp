@@ -3,10 +3,10 @@
 /
 &TIMESTEPPING
  TIME_STEP   = 300D0,
- START_TIME  = 1800.0D0,
+ START_TIME  = 0.0D0,
  END_TIME    = 3600.0D0,
  MSIS_TIME_STEP   = 300.D0,
- INITIAL_TIMESTAMP = 201303160030
+ INITIAL_TIMESTAMP = 201303160000,
 /
 &FORCING
  SOLAR_FORCING_TIME_STEP = 60.0D0,
@@ -16,33 +16,41 @@
  F107_KP_DATA_SIZE       = 2221,
  F107_KP_READ_IN_START   = 0,
  F107_KP_FILE            = './wam_input_f107_kp.txt',
- F107_KP_REALTIME_INTERVAL = 
+ F107_KP_REALTIME_INTERVAL = 0,
 /
 &FILEIO
  READ_APEX_NEUTRALS        = T,
  WRITE_APEX_NEUTRALS       = T,
  WRITE_GEOGRAPHIC_NEUTRALS = T,
- FILE_OUTPUT_FREQUENCY     = 300.0D0
+ FILE_OUTPUT_FREQUENCY     = 300.0D0,
  FILE_PREFIX               = 'IPE_State.apex.',
- FILE_EXTENSION            = .nc
+ FILE_EXTENSION            = '.nc',
 /
 &ipecap
-  mesh_height_min = 0.
-  mesh_height_max = 2000.
-  mesh_write      = 0
-  mesh_write_file = 'ipemesh'
-  mesh_fill       = 1
+  mesh_height_min = 0.,
+  mesh_height_max = 2000.,
+  mesh_write      = 0,
+  mesh_write_file = 'ipemesh',
+  mesh_fill       = 1,
 /
 &ELDYN
-  DYNAMO_EFIELD          = T
+  DYNAMO_EFIELD = T,
 /
 &OPERATIONAL
-  COLFAC                 = 1.3
-  OFFSET1_DEG            = 5.0
-  OFFSET2_DEG            = 20.0
-  POTENTIAL_MODEL        = 2
-  HPEQ                   = 0.0
-  TRANSPORT_HIGHLAT_LP   = 30
-  PERP_TRANSPORT_MAX_LP  = 151
-  VERTICAL_WIND_LIMIT    = 100.0
+  COLFAC                 = 1.3,
+  OFFSET1_DEG            = 5.0,
+  OFFSET2_DEG            = 20.0,
+  POTENTIAL_MODEL        = 2,
+  HPEQ                   = 0.0,
+  TRANSPORT_HIGHLAT_LP   = 30,
+  PERP_TRANSPORT_MAX_LP  = 151,
+  VERTICAL_WIND_LIMIT    = 100.0,
+/
+&MILE
+  MILE_VERBOSE = 2,
+  MILE_EFIELD = 'weimer',
+  MILE_AURORA = 'fta',
+  MILE_DIR = './extIE/',
+  AMIEFILENORTH = 'none',
+  AMIEFILESOUTH = 'none'
 /
