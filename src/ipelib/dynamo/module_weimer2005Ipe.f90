@@ -25,7 +25,6 @@
 !
 ! Location of W05scEpot.dat, W05SCHAtable.dat, W05scBndy.dat
 !  character*7  :: file_location = 'moddta/'
-      character(len=*),parameter  :: fileLocation = 'UA/dataIn'
 !
       real*8 :: rad2deg,deg2rad ! set by setmodel
       real*8 :: bndyfitr        ! calculated by setboundary
@@ -37,7 +36,7 @@
       real*8 :: nlms(csize)
 !
       PRIVATE
-      PUBLIC :: setmodel2005Ipe,epotval2005Ipe,fileLocation
+      PUBLIC :: setmodel2005Ipe,epotval2005Ipe
       contains
 !----------------------------------------------------------------------
 !----------------------------------------------------------------------
@@ -79,19 +78,19 @@
 ! Read data:
       if (trim(model) == 'epot') then
          call read_potential2005Ipe( &
-              fileLocation // '/global_idea_coeff_W05scEpot.dat', rc=lrc)
+              trim(file_path) // '/global_idea_coeff_W05scEpot.dat', rc=lrc)
       if (ipe_error_check(lrc, &
            msg="call to read_potential2005Ipe failed - model=" // model, &
            rc=rc)) return
       else
          call read_potential2005Ipe( &
-              fileLocation // '/global_idea_coeff_W05scBpot.dat', rc=lrc)
+              trim(file_path) // '/global_idea_coeff_W05scBpot.dat', rc=lrc)
          if (ipe_error_check(lrc, &
               msg="call to read_potential2005Ipe failed - model="//model, &
               rc=rc)) return
       endif
       call schatable2005Ipe( &
-           fileLocation // '/global_idea_coeff_W05SCHAtable.dat', rc=lrc)
+           trim(file_path) // '/global_idea_coeff_W05SCHAtable.dat', rc=lrc)
       if (ipe_error_check(lrc, &
            msg="call to schatable2005Ipe failed",rc=rc)) return
 !
@@ -163,7 +162,7 @@
 !
 ! Read data:
       call read_bndy2005Ipe( &
-           fileLocation // '/global_idea_coeff_W05scBndy.dat',rc=lrc)
+           trim(file_path) // '/global_idea_coeff_W05scBndy.dat',rc=lrc)
       if (ipe_error_check(lrc,msg="call to read_bndy2005Ipe failed", rc=rc)) &
            return
 !
