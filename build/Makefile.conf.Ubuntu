@@ -22,7 +22,7 @@ LIBRARIES = -lcomio -lhdf5hl_fortran -lhdf5_hl -lhdf5_fortran -lhdf5 -lcrypto -l
 
 #PreProc = -DsysLinux -DcompGFORTRAN -DPACKAGE_NAME=\"ipe\" -DPACKAGE_TARNAME=\"ipe\" -DPACKAGE_VERSION=\"0.0.1\" -DPACKAGE_STRING=\"ipe\ 0.0.1\" -DPACKAGE_BUGREPORT=\"ipe_devteam@noaa.gov\" -DPACKAGE_URL=\"\" -DPACKAGE=\"ipe\" -DVERSION=\"0.0.1\" -DHAVE_MPI=1 -DHAVE_COMIO=1 -DHAVE_ESMF=1 
 
-PreProc = -DHAVE_MPI
+PreProc = -DHAVE_MPI -DHAVE_MILE
 
 #-I/usr/lib/x86_64-linux-gnu/hdf5/openmpi
 
