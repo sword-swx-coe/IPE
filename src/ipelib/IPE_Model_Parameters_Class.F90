@@ -78,6 +78,7 @@ MODULE IPE_Model_Parameters_Class
      REAL(prec)     :: file_output_frequency
      CHARACTER(200) :: file_prefix
      CHARACTER(3)   :: file_extension
+     CHARACTER(200) :: input_file_dir
 
      !ElDyn
      LOGICAL :: dynamo_efield
@@ -148,6 +149,7 @@ CONTAINS
     REAL(prec)     :: file_output_frequency
     CHARACTER(200) :: file_prefix
     CHARACTER(3)   :: file_extension
+    CHARACTER(200) :: input_file_dir
     REAL(prec)     :: mesh_height_min
     REAL(prec)     :: mesh_height_max
     INTEGER        :: mesh_fill
@@ -201,7 +203,7 @@ CONTAINS
     integer :: iFile
     
     ! Communication buffers
-    CHARACTER(LEN=200), DIMENSION(6) :: sbuf
+    CHARACTER(LEN=200), DIMENSION(25) :: sbuf
     INTEGER, DIMENSION(30) :: ibuf
     REAL(prec), DIMENSION(26) :: rbuf
 
@@ -225,7 +227,8 @@ CONTAINS
          read_apex_neutrals, read_geographic_neutrals, &
          write_apex_neutrals, write_geographic_neutrals, &
          write_geographic_eldyn, write_apex_eldyn, &
-         file_output_frequency, file_prefix, file_extension
+         file_output_frequency, file_prefix, file_extension, &
+         input_file_dir
     NAMELIST / IPECAP / &
          mesh_height_min, mesh_height_max, mesh_fill, mesh_write, &
          mesh_write_file, import_write, export_write, ipe_has_import
@@ -292,6 +295,7 @@ CONTAINS
     file_output_frequency     = 180.0_prec
     file_prefix               = "IPE_State.apex."
     file_extension            = ".nc"
+    input_file_dir = "./"
 
     ! IPECAP !
     mesh_height_min =   0.
@@ -409,6 +413,7 @@ CONTAINS
       sbuf(4) = mesh_write_file
       sbuf(5) = file_prefix
       sbuf(6) = file_extension
+      sbuf(7) = input_file_dir
 
       ! MILE string buffer:
       sbufMile(1) = mile_efield
@@ -474,6 +479,10 @@ CONTAINS
    params % mesh_write_file   = sbuf(4)
    params % file_prefix       = sbuf(5)
    params % file_extension    = sbuf(6)
+   params % input_file_dir    = sbuf(7)
+   IF ( mpi_layer % rank_id == 0 ) &
+     write(*,*) '-> Setting input directory to -->', &
+     trim(params % input_file_dir), '<--'
 
 #ifdef HAVE_MPI
    CALL MPI_BCAST( &
