@@ -351,6 +351,8 @@ CONTAINS
          call mile_prepare_aurora_grid(grid, time_tracker)
          call ieModel_ % get_aurora(eflux2d, avee2d)
 
+         where (eflux2d < 0.01) eflux2d = 0.0 
+
          HPn = sum( &
               area2d(:, 1:grid % nlp) * &
               eflux2d(:, 1:grid % nlp)/1000.0) / 1e9
@@ -435,7 +437,7 @@ CONTAINS
              if (iE > nMlts) iE = nMlts
              ! Convert from hours to degrees
              dMlt = &
-                  (mlts2d(iE, iLat) - mlts2d(iS, iLat)) / &
+                  abs(mlts2d(iE, iLat) - mlts2d(iS, iLat)) / &
                   (iE - iS) * 180.0/12.0
              iS = iLat - 1 
              iE = iLat + 1 
