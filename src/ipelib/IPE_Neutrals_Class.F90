@@ -1,5 +1,6 @@
 MODULE IPE_Neutrals_Class
 
+  USE IPE_Model_Parameters_Class
   USE IPE_Precision
   USE IPE_Constants_Dictionary
   USE IPE_Grid_Class
@@ -53,8 +54,7 @@ MODULE IPE_Neutrals_Class
 
   END TYPE IPE_Neutrals
 
-
-  CHARACTER(250), PARAMETER      :: hwm_path     = './'
+  CHARACTER(200) :: hwm_path
 
   INTEGER,    PARAMETER, PRIVATE :: N_heights    = 72
   INTEGER,    PARAMETER, PRIVATE :: N_Latitudes  = 19
@@ -66,13 +66,14 @@ MODULE IPE_Neutrals_Class
 
 CONTAINS
 
-  SUBROUTINE Build_IPE_Neutrals( neutrals, nFluxTube, NLP, NMP, mp_low, mp_high, rc )
+  SUBROUTINE Build_IPE_Neutrals( neutrals, nFluxTube, NLP, NMP, mp_low, mp_high, parameters, rc )
     IMPLICIT NONE
     CLASS( IPE_Neutrals ), INTENT(inout) :: neutrals
     INTEGER,               INTENT(in)    :: nFluxTube
     INTEGER,               INTENT(in)    :: NLP
     INTEGER,               INTENT(in)    :: NMP
     INTEGER,               INTENT(in)    :: mp_low, mp_high
+    TYPE( IPE_Model_Parameters ), intent(in) :: parameters
     INTEGER, OPTIONAL,     INTENT(out)   :: rc
 
     INTEGER :: stat
@@ -80,6 +81,8 @@ CONTAINS
     REAL(msis_dp), DIMENSION(25):: switch
 
     IF ( PRESENT( rc ) ) rc = IPE_SUCCESS
+
+    hwm_path = trim(parameters % input_file_dir)
 
     switch(:) =  1.0_msis_dp
     switch(9) = -1.0_msis_dp
