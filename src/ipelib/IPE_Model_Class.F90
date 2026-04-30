@@ -164,6 +164,7 @@ CONTAINS
          NMP = ipe % grid % NMP, &
          mp_low = ipe % mpi_layer % mp_low, &
          mp_high = ipe % mpi_layer % mp_high, &
+         parameters = ipe % parameters, &
          rc = localrc )
     IF ( ipe_error_check( localrc, msg="Failed to initialize neutrals", &
          line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
