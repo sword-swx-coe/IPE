@@ -69,6 +69,10 @@ test_rundir:
 	  ln -s ../data/IPE_State.apex.201303160000.nc .; \
 	  ln -s ../data/IPE_State.apex.201303160005_ref.nc .; \
 	  ln -s ../data/global_idea_coeff_W05* .; \
+	  ln -s ../data/hwm123114.bin .; \
+	  ln -s ../data/dwm07b104i.dat .; \
+	  ln -s ../data/gd2qd.dat .; \
+	  ln -s ../data/wam_input_f107_kp.txt .; \
 	fi
 
 # Needed for hot restart only
