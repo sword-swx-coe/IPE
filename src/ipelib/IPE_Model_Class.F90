@@ -42,10 +42,11 @@ MODULE IPE_Model_Class
      PROCEDURE :: Build => Build_IPE_Model
      PROCEDURE :: Trash => Trash_IPE_Model
 
-     PROCEDURE :: Update     => Update_IPE_Model
+     PROCEDURE :: Update => Update_IPE_Model
      PROCEDURE :: Initialize => Initialize_IPE_Model
-     PROCEDURE :: Write      => Write_IPE_State
-     PROCEDURE :: Read       => Read_IPE_State
+     PROCEDURE :: WriteStates => Write_IPE_State
+     PROCEDURE :: Write2d => Write_IPE_2d
+     PROCEDURE :: Read => Read_IPE_State
 
   END TYPE IPE_Model
 
@@ -278,7 +279,7 @@ CONTAINS
        
        call ipe % forcing % Update_Current_Index( &
             ipe % parameters, &
-            ipe % time_tracker % elapsed_sec, &
+            ipe % time_tracker, &
             rc = localrc )
        IF ( ipe_error_check( &
             localrc, msg="Failed to update driver index", &
@@ -712,6 +713,83 @@ CONTAINS
 
     IF ( PRESENT( rc ) ) rc = IPE_SUCCESS
    END SUBROUTINE Warm_Start_Initialize !(ipe, filename, rc)  
+
+
+  ! -------------------------------------------------------------------------
+  ! -------------------------------------------------------------------------
+
+  SUBROUTINE Write_IPE_2d( ipe, rc )
+
+    IMPLICIT NONE
+
+    CLASS( IPE_Model ), INTENT(inout) :: ipe
+    INTEGER, OPTIONAL,  INTENT(out)   :: rc
+
+    ! Local
+    CHARACTER(215)  :: filename
+    INTEGER, PARAMETER :: num_groups = 1
+    CHARACTER(LEN=*), DIMENSION(num_groups),   PARAMETER :: groups = (/ "apex" /)
+
+    INTEGER :: item
+    CHARACTER(LEN=28) :: dset_name
+
+    ! Begin
+
+    IF ( PRESENT( rc ) ) rc = IPE_FAILURE
+
+    filename = "ipe_2d." // &
+               ipe % time_tracker % DateStamp ( ) // &
+               ipe % parameters % file_extension
+
+    IF( ipe % mpi_layer % rank_id == 0 )THEN
+      write(*,*) '-> Writing output file : '//TRIM(filename)
+    ENDIF
+
+    ! Create HDF5 input file
+    CALL ipe % io % open(filename, "c")
+    IF (ipe % io % err % check(msg="Unable to open file "//filename, &
+      file=__FILE__, line=__LINE__)) RETURN
+
+    ! Setup common data decomposition for datasets
+    CALL ipe % io % domain( (/ ipe % grid % NLP, ipe % grid % NMP /), &
+      (/ 1, ipe % mpi_layer % mp_low /), &
+      (/ ipe % grid % NLP, ipe % mpi_layer % mp_high - ipe % mpi_layer % mp_low + 1 /) )
+    IF (ipe % io % err % check(msg="Failed to setup I/O data decomposition", &
+      file=__FILE__, line=__LINE__)) RETURN
+
+    ! Write out electric field stuff:
+    CALL ipe % io % write("ElectricPotential", &
+        ipe % eldyn % electric_potential(1:ipe % grid % NLP, ipe % mpi_layer % mp_low:ipe % mpi_layer % mp_high))
+    IF (ipe % io % err % check(msg="Unable to write dataset ElectricPotential", &
+        file=__FILE__, line=__LINE__)) RETURN
+    CALL ipe % io % write("ExB_East", &
+        ipe % eldyn % v_ExB_apex(1, 1:ipe % grid % NLP, ipe % mpi_layer % mp_low:ipe % mpi_layer % mp_high))
+    IF (ipe % io % err % check(msg="Unable to write dataset ExB_East", &
+        file=__FILE__, line=__LINE__)) RETURN
+    CALL ipe % io % write("ExB_North", &
+        ipe % eldyn % v_ExB_apex(2, 1:ipe % grid % NLP, ipe % mpi_layer % mp_low:ipe % mpi_layer % mp_high))
+    IF (ipe % io % err % check(msg="Unable to write dataset ExB_East", &
+        file=__FILE__, line=__LINE__)) RETURN
+
+    CALL ipe % io % write("EFlux", &
+        ipe % plasma % aurora_eflux2d(1:ipe % grid % NLP, ipe % mpi_layer % mp_low:ipe % mpi_layer % mp_high))
+    IF (ipe % io % err % check(msg="Unable to write dataset Eflux", &
+        file=__FILE__, line=__LINE__)) RETURN
+    CALL ipe % io % write("AveE", &
+        ipe % plasma % aurora_avee2d(1:ipe % grid % NLP, ipe % mpi_layer % mp_low:ipe % mpi_layer % mp_high))
+    IF (ipe % io % err % check(msg="Unable to write dataset AveE", &
+        file=__FILE__, line=__LINE__)) RETURN
+
+
+
+    ! Close HDF5 file
+    CALL ipe % io % close()
+    IF (ipe % io % err % check(msg="Unable to close file "//filename, &
+      file=__FILE__, line=__LINE__)) RETURN
+
+    IF ( PRESENT( rc ) ) rc = IPE_SUCCESS
+
+  end subroutine Write_IPE_2d
 
   ! -------------------------------------------------------------------------
   ! -------------------------------------------------------------------------
