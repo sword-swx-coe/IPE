@@ -327,7 +327,7 @@ CONTAINS
       ut = REAL(hour*60 + minute,prec) ! [ minutes ]
 
 
-      diff_minutes = REAL( day_diff*86400, prec ) + time_tracker % utime/60.0_prec - ut
+      diff_minutes = REAL( day_diff*1440, prec ) + time_tracker % utime/60.0_prec - ut
 
   END FUNCTION Calculate_Date_Difference
 

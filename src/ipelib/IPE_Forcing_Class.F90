@@ -265,6 +265,8 @@ CONTAINS
     class( ipe_time ), intent(in) :: ipeTime
     INTEGER, INTENT(out)   :: rc
 
+    integer :: verbose = 0
+
     real(prec) :: deltime
 
     ! Local
@@ -282,11 +284,18 @@ CONTAINS
         forcing % start_time % month, &
         forcing % start_time % day, &
         forcing % start_time % hour, &
-        forcing % start_time % minute )
+        forcing % start_time % minute ) * 60.0
 
     forcing % current_index = INT( deltime / real(params % f107_kp_interval) ) + &
                                       1 + params % f107_kp_skip_size
 
+    if (verbose > 0) then
+      write(*,*) "current_index : ", forcing % current_index
+      write(*,*) 'deltime : ', deltime, &
+        forcing % start_time % day, forcing % start_time % hour, forcing % start_time % minute, &
+        ipeTime % day, ipeTime % hour, ipeTime % minute
+    endif
+    
     if ( params % use_f107_kp_file .and. forcing % current_index > forcing % max_read_index &
              .and. params % f107_kp_realtime_interval > 0 ) then
       call forcing % read_f107kp_ipe_forcing( params % f107_kp_file,   &
