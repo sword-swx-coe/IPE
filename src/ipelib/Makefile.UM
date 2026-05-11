@@ -11,9 +11,9 @@ MODULES = \
 	IPE_Constants_Dictionary.o\
 	IPE_MPI_Layer_Class.o\
 	IPE_Model_Parameters_Class.o\
+	IPE_Time_Class.o\
 	IPE_Forcing_Class.o\
 	IPE_Grid_Class.o\
-	IPE_Time_Class.o\
 	IPE_Neutrals_Class.o\
 	IPE_Plasma_Class.o\
 	IPE_Electrodynamics_Class.o\
