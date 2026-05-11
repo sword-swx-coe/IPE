@@ -32,7 +32,8 @@ IMPLICIT NONE
 
     DO i = 1, ipe % parameters % n_model_updates
 
-      IF( ipe % mpi_layer % rank_id == 0 ) PRINT*, 'Starting time loop at time :', ipe % time_tracker % DateStamp( )
+      IF (ipe % mpi_layer % rank_id == 0) &
+        write(*,*) 'Starting time loop at time : ', ipe % time_tracker % DateStamp( )
 
       CALL CPU_TIME(t1)
       t0_ipe = ipe % parameters % start_time + REAL(i-1,prec)*ipe % parameters % file_output_frequency
@@ -44,9 +45,15 @@ IMPLICIT NONE
 
       CALL CPU_TIME(t2)
 
-      CALL ipe % Write( rc=rc )
+      CALL ipe % WriteStates( rc=rc )
       IF ( ipe_iostatus_check( rc, msg="Error writing IPE output file", &
         line=__LINE__, file=__FILE__ ) ) CALL ipe % Trash()
+
+      CALL ipe % Write2d( rc=rc )
+      IF ( ipe_iostatus_check( rc, msg="Error writing IPE output file", &
+        line=__LINE__, file=__FILE__ ) ) CALL ipe % Trash()
+      
+
       IF( ipe % mpi_layer % rank_id == 0 )THEN
         write(6,*) '***********************************************'
         write(6,*) '*                                             *'
