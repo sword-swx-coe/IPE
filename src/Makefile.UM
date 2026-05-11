@@ -5,20 +5,6 @@ MY_LIB = ${LIBDIR}/libIPE.a
 
 EXTRASEARCH = -I${MSISDIR} -I${EFIELDDIR} -I${DYNAMODIR} -I${IPEDIR}
 
-MODULES = \
-	IPE_Precision.o\
-	IPE_Common_Routines.o\
-	IPE_Constants_Dictionary.o\
-	IPE_MPI_Layer_Class.o\
-	IPE_Model_Parameters_Class.o\
-	IPE_Forcing_Class.o\
-	IPE_Grid_Class.o\
-	IPE_Time_Class.o\
-	IPE_Neutrals_Class.o\
-	IPE_Plasma_Class.o\
-	IPE_Electrodynamics_Class.o\
-	IPE_Model_Class.o
-
 OBJECTS_EXE = IPE_Driver.o
 
 EXE = ${BINDIR}/ipe.exe
