@@ -214,15 +214,19 @@ CONTAINS
 
     ! Local
     LOGICAL :: msis_switch
-    INTEGER :: localrc
+    INTEGER :: localrc, verbose
 
     IF ( PRESENT( rc ) ) rc = IPE_SUCCESS
 
     msis_switch = mod(time % elapsed_sec,params % msis_time_step) == 0.0
 
     IF ( msis_switch .and. (time % elapsed_sec > 0._prec .or. .NOT. params % read_apex_neutrals) ) THEN
-      IF( mpi_layer % rank_id == 0 ) write(6,*) 'Calling MSIS ', int(time % elapsed_sec / 60), ' Mins UT'
-      CALL neutrals % IPE_Neutrals_Empirical( grid, time, forcing, rc=localrc )
+      verbose = 0
+      IF( mpi_layer % rank_id == 0 ) then
+          write(6,*) '-> Calling MSIS ', int(time % elapsed_sec / 60), ' Mins UT'
+          verbose = 0
+      endif
+      CALL neutrals % IPE_Neutrals_Empirical( grid, time, forcing, verbose, rc=localrc)
       IF ( ipe_error_check( localrc, msg="call to IPE_Neutrals_Empirical failed", rc=rc ) ) RETURN
     ENDIF
 
@@ -306,7 +310,7 @@ CONTAINS
   END SUBROUTINE IPE_Neutrals_Extrapolate
 
 
-  SUBROUTINE IPE_Neutrals_Empirical( neutrals, grid, time, forcing, rc )
+  SUBROUTINE IPE_Neutrals_Empirical( neutrals, grid, time, forcing, verbose, rc)
   !
   ! Usage :
   !
@@ -320,6 +324,7 @@ CONTAINS
     TYPE( IPE_Time ),      INTENT(in)    :: time
     TYPE( IPE_Forcing ),   INTENT(in)    :: forcing
     INTEGER, OPTIONAL,     INTENT(out)   :: rc
+    integer, intent(in) :: verbose
 
     ! Local
     INTEGER    :: localrc
@@ -337,7 +342,7 @@ CONTAINS
     REAL(msis_dp), DIMENSION(9) :: densities
 
     INTEGER, PARAMETER    :: msis_mass = 48
-
+    integer :: iAp
 
     IF ( PRESENT( rc ) ) rc = IPE_SUCCESS
 
@@ -355,6 +360,13 @@ CONTAINS
     temperatures = 0.0_msis_dp
 
     iyd = 99000 + time % day_of_year    ! Input, year and day as yyddd
+
+    if (verbose > 0) then
+      write(*,*) '  -> Drivers (F107a/d, ap): ', int(msis_f107a), int(msis_f107d)
+      do iAp = 1, 7
+        write(*,*) '    -> Ap : ', iAp, msis_ap(iAp)
+      enddo
+    endif
 
     DO mp = grid % mp_low, grid % mp_high
       DO lp = 1, grid % NLP
