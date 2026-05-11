@@ -575,8 +575,7 @@ CONTAINS
         line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
       mlat90_rad = dtr * colat
     ENDIF
-
-
+    
     ! Search for nearest grid points in the magnetic longitude/latitude grid
     DO mp = grid % mp_low - grid % mp_halo, grid % mp_high + grid % mp_halo
       lon = grid % magnetic_longitude(mp)
@@ -861,6 +860,7 @@ CONTAINS
     REAL(prec) :: ylatm_deg_map(kmlat)
     REAL(prec) :: ed1dy_map(82,kmlat)
     REAL(prec) :: ed2dy_map(82,kmlat)
+    real(prec) :: pot_map(82,kmlat)
 
     IF ( PRESENT( rc ) ) rc = IPE_SUCCESS
 
@@ -1024,10 +1024,19 @@ CONTAINS
 ! Can we push the dynamo grid to match the IPE grid (NMP,2*NLP)?
 ! ************************ !
 
+    ! This gets the high latitude potential pattern:
+    !   potential_model is which model to use:
+    !     1 = Heelis
+    !     2 = Weimer
+    !     10 = MILE
+    !  potential is stored in variable - phihm
     call highlat( offset1_deg,offset2_deg, potential_model, rc=localrc )
     if (ipe_error_check(localrc,msg="call to highlat failed", &
       line=__LINE__, file=__FILE__, rc=rc)) return
 
+    ! This calculates the dynamo, and then blends it into the high latitude
+    ! solution.
+    ! potential is stored in variable - phim
     call dynamo( rc = localrc )
     if (ipe_error_check(localrc,msg="call to dynamo failed", &
       line=__LINE__, file=__FILE__, rc=rc)) return
@@ -1055,6 +1064,14 @@ CONTAINS
     ed2dy_map(1,:)=ed2dy(40,:)
     ed2dy_map(82,:)=ed2dy(41,:)
 
+    pot_map(2:41,:)=phim(41:80,:)
+    pot_map(42:81,:)=phim(1:40,:)
+    pot_map(1,:)=phim(40,:)
+    pot_map(82,:)=phim(41,:)
+
+
+    ! This subroutine is really just an interpolation routine to move a variable from one grid to the
+    ! IPE grid.  It just fills in the electric_potential variable.
     CALL eldyn % Regrid_Potential( grid,mpi_layer, time_tracker,ed1dy_map,xlonm_deg_map,ylatm_deg_map, 1, 82,kmlat, rc=localrc )
     IF ( ipe_error_check( localrc, msg="call to Regrid_Potential (ed1dy_map) failed", line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
     eldyn % electric_field(1,:,:) = eldyn % electric_potential(:,grid % mp_low:grid % mp_high)
@@ -1062,6 +1079,11 @@ CONTAINS
     CALL eldyn % Regrid_Potential( grid,mpi_layer, time_tracker,ed2dy_map,xlonm_deg_map,ylatm_deg_map, 1, 82,kmlat, rc=localrc )
     IF ( ipe_error_check( localrc, msg="call to Regrid_Potential (ed2dy_map) failed", line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
     eldyn % electric_field(2,:,:) = eldyn % electric_potential(:,grid % mp_low:grid % mp_high)
+
+
+    CALL eldyn % Regrid_Potential( grid, mpi_layer, time_tracker, pot_map, xlonm_deg_map,ylatm_deg_map, 1, 82,kmlat, rc=localrc )
+    IF ( ipe_error_check( localrc, msg="call to Regrid_Potential (ed2dy_map) failed", line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+
 
   END SUBROUTINE Dynamo_Wrapper
 
