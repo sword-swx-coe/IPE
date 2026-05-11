@@ -5,6 +5,7 @@ USE IPE_Constants_Dictionary
 USE IPE_Common_Routines
 USE IPE_Model_Parameters_Class
 USE ipe_error_module
+USE IPE_Time_Class
 
 IMPLICIT NONE
 
@@ -19,7 +20,10 @@ IMPLICIT NONE
     REAL(prec)              :: current_time
     INTEGER                 :: current_index
     INTEGER                 :: max_read_index
-    !
+
+    TYPE( IPE_Time ) :: start_time
+    CHARACTER(12) :: initial_timestamp
+
     REAL(prec), ALLOCATABLE :: f107(:)
     INTEGER, ALLOCATABLE    :: f107_flag(:)
     REAL(prec), ALLOCATABLE :: f107_81day_avg(:)
@@ -158,6 +162,9 @@ CONTAINS
     IF( ipe_error_check( localrc, msg="call to Read_Tiros_IPE_Forcing failed", &
       line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
+    ! This is new - let's at least keep track of the start time:
+    CALL forcing % start_time % Build( forcing % initial_timestamp, 2 )
+    
   END SUBROUTINE Build_IPE_Forcing
 
 
@@ -249,19 +256,33 @@ CONTAINS
   END FUNCTION GetKP
 
 
-  SUBROUTINE Update_Current_Index( forcing, params, deltime, rc )
+  SUBROUTINE Update_Current_Index( forcing, params, ipeTime, rc )
 
     IMPLICIT NONE
 
-    CLASS( IPE_Forcing ),          INTENT(inout) :: forcing
+    CLASS( IPE_Forcing ), INTENT(inout) :: forcing
     CLASS( IPE_Model_Parameters ), INTENT(in)    :: params
-    REAL(prec),                    INTENT(in)    :: deltime
-    INTEGER,                       INTENT(out)   :: rc
+    class( ipe_time ), intent(in) :: ipeTime
+    INTEGER, INTENT(out)   :: rc
+
+    real(prec) :: deltime
 
     ! Local
     INTEGER :: localrc
 
     rc = IPE_SUCCESS
+
+    ! the old way of doing this was that deltime = elapsed time
+    ! new way:
+    !   - calculate the time between the current time and the start time
+    !     of the index file, which is stored in start_time
+
+    deltime = ipeTime  % Calculate_Date_Difference( &
+        forcing % start_time % year, &
+        forcing % start_time % month, &
+        forcing % start_time % day, &
+        forcing % start_time % hour, &
+        forcing % start_time % minute )
 
     forcing % current_index = INT( deltime / real(params % f107_kp_interval) ) + &
                                       1 + params % f107_kp_skip_size
@@ -346,6 +367,20 @@ CONTAINS
                                      forcing % solarwind_velocity(i), &
                                      forcing % solarwind_Bz(i), &
                                      forcing % solarwind_density(i)
+      if (i == read_in_start) then
+        ! of course these are in different formats.
+        ! year
+        forcing % initial_timestamp(1:4) = date_work(1:4)
+        ! month
+        forcing % initial_timestamp(5:6) = date_work(6:7)
+        ! month
+        forcing % initial_timestamp(7:8) = date_work(9:10)
+        ! month
+        forcing % initial_timestamp(9:10) = date_work(12:13)
+        ! month
+        forcing % initial_timestamp(11:12) = date_work(15:16)
+      endif
+
       IF ( ipe_iostatus_check( iostat, msg="Error reading forcing file "//filename, &
         line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
