@@ -85,10 +85,6 @@
 ! rim(1)   = K_(m phi)^D(0)^T
 ! rim(2)   = K_(m lam)^D(0)^T
 !
-
-
-
-
       do j=1,kmlath
         do i=1,kmlonp1
           zigm11(i,kmlatp1-j) = (zigm11(i,kmlatp1-j)+zigm11(i,j))
