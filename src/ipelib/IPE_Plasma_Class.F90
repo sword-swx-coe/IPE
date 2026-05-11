@@ -38,6 +38,8 @@ MODULE IPE_Plasma_Class
     REAL(prec), ALLOCATABLE :: ionization_rates(:,:,:,:)
     REAL(prec), ALLOCATABLE :: conductivities(:,:,:,:)
 
+    REAL(prec), ALLOCATABLE :: aurora_eflux2d(:,:)
+    REAL(prec), ALLOCATABLE :: aurora_avee2d(:,:)
 
     CONTAINS
 
@@ -151,7 +153,7 @@ CONTAINS
     plasma % mp_halo   = halo
 
     iStart = mp_low-halo
-    iEnd = mp_high+halo 
+    iEnd = mp_high+halo
     ALLOCATE( &
          plasma % ion_densities(1:n_ion_species,1:nFluxTube,1:NLP,iStart:iEnd), &
          plasma % ion_velocities(1:n_ion_species,1:nFluxTube,1:NLP,iStart:iEnd), &
@@ -172,8 +174,16 @@ CONTAINS
     IF ( ipe_alloc_check( stat, &
          msg="Failed to allocate plasma internal arrays", &
          line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
-    
-    nMlts = mp_high - mp_low + 1
+
+    ALLOCATE( &
+         plasma % aurora_eflux2d(1:NLP,iStart:iEnd), &
+         plasma % aurora_avee2d(1:NLP,iStart:iEnd), &
+         stat = stat )
+    IF ( ipe_alloc_check( stat, &
+         msg="Failed to allocate plasma AURORA arrays", &
+         line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+
+    nMlts = iEnd - iStart + 1
     nLats = NLP * 2
 
 #ifdef HAVE_MILE
@@ -215,7 +225,6 @@ CONTAINS
 
     IF ( PRESENT( rc ) ) rc = IPE_SUCCESS
 
-
     DEALLOCATE( plasma % ion_densities, &
                 plasma % ion_velocities, &
                 plasma % ion_temperature, &
@@ -233,6 +242,12 @@ CONTAINS
                 plasma % conductivities, &
                 stat = stat )
     IF ( ipe_dealloc_check( stat, msg="Unable to free up memory", &
+      line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+
+    DEALLOCATE( plasma % aurora_eflux2d, &
+                plasma % aurora_avee2d, &
+                stat = stat )
+    IF ( ipe_dealloc_check( stat, msg="Unable to free up plasma - AURORA memory", &
       line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
 #ifdef HAVE_MILE
@@ -272,7 +287,7 @@ CONTAINS
 
     ! Local
     INTEGER :: n_transport_timesteps
-    INTEGER :: i, lp, mp, j, localrc, iMlt, iLat
+    INTEGER :: i, lp, mp, j, localrc, iMlt, iLat, iMltS
     INTEGER :: nflag_t(1 : plasma % NLP,plasma % mp_low : plasma % mp_high)
     INTEGER :: nflag_d(1 : plasma % NLP,plasma % mp_low : plasma % mp_high)
     REAL(prec) :: max_transport_convection_ratio_local
@@ -350,8 +365,18 @@ CONTAINS
       if (useMile) then
          call mile_prepare_aurora_grid(grid, time_tracker)
          call ieModel_ % get_aurora(eflux2d, avee2d)
-
          where (eflux2d < 0.01) eflux2d = 0.0 
+
+         ! Save values for output:
+         ! MILE assumes (lon,lat), while IPE uses (lat,lon), so need to rotate the arrays:
+
+         do iLat = 1, grid % nlp
+           do iMlt = grid % mp_low - grid % mp_halo, grid % mp_high + grid % mp_halo
+             iMltS = iMlt - (mpi_layer % mp_low - grid % mp_halo) + 1
+             plasma % aurora_eflux2d(iLat, iMlt) = eflux2d(iMltS, iLat)
+             plasma % aurora_avee2d(iLat, iMlt) = avee2d(iMltS, iLat)
+           enddo
+         enddo
 
          HPn = sum( &
               area2d(:, 1:grid % nlp) * &
@@ -400,17 +425,28 @@ CONTAINS
     TYPE( IPE_Time ), INTENT(in) :: time_tracker
 
     integer :: iS, iE, iLat, iMlt, mp, lp
-    real :: dMlt, dLat
+    real :: dMlt, dLat, lon
     
     if (iMileVerbose >= 0) then
        write(*,*) "-> MILE: Setting grid for aurora"
     endif
     ! Set up grid for working with MILE:
-    DO mp = grid % mp_low, grid % mp_high
-       iMlt = mp - grid % mp_low + 1
+    DO mp = grid % mp_low - grid % mp_halo, grid % mp_high + grid % mp_halo
+       iMlt = mp - (grid % mp_low - grid % mp_halo) + 1
        DO lp = 1, grid % NLP
           mlts2d(iMlt, lp) = time_tracker % utime/3600.0_prec + &
                rtd * grid % longitude(1,lp,mp)/15.0_prec
+          ! This is a bug fix for IPE, maybe???
+          if (grid % longitude(1,lp,mp) == 0) then
+            if (mp > 2) then
+              lon = 2 * grid % longitude(1,lp,mp-1) - grid % longitude(1,lp,mp-2)
+              mlts2d(iMlt, lp) = time_tracker % utime/3600.0_prec + rtd * lon/15.0_prec
+            endif
+            if (mp < 2) then
+              lon = 2 * grid % longitude(1,lp,mp+1) - grid % longitude(1,lp,mp+2)
+              mlts2d(iMlt, lp) = time_tracker % utime/3600.0_prec + rtd * lon/15.0_prec
+            endif
+          endif
           iLat = lp
           lats2d(iMlt, iLat) = &
                rtd * ( half_pi - grid % magnetic_colatitude(1,lp) )
@@ -419,11 +455,10 @@ CONTAINS
           mlts2d(iMlt, iLat) = mlts2d(iMlt, lp)
        enddo
     enddo
-
     call ieModel_ % nMlts(nMlts)
     call ieModel_ % nLats(nLats)      
     call ieModel_ % grid(mlts2d, lats2d)
-    
+
     if (doCalculateArea) then
        if (iMileVerbose >= 0) then
           write(*,*) "-> MILE: Calculating area for hemispheric power"
@@ -1328,7 +1363,8 @@ CONTAINS
     nLats = (grid % NLP) * 2
       
     DO mp = plasma % mp_low, plasma % mp_high
-       iMlt = mp - plasma % mp_low + 1
+       ! We include the halo, so make sure to offset by that!
+       iMlt = mp - plasma % mp_low + 1 + grid % mp_halo
        DO lp = 1, grid % NLP
           iLatS = nLats - lp + 1
 
