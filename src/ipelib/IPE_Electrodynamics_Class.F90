@@ -392,14 +392,23 @@ CONTAINS
     iyear = 1999
 
     call get_efield_ipe(mpi_layer%rank_id, rc=localrc)
-    IF ( ipe_error_check( localrc, msg="call to get_efield_ipe failed", line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+    IF ( ipe_error_check( localrc, msg="call to get_efield_ipe failed", &
+         line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
     ! Interpolate the potential to the IPE grid
     potent_local = potent
     mlt_local    = ylonm
     colat_local  = rtd * theta90_rad
-    CALL eldyn % Regrid_Potential( grid, mpi_layer, time_tracker, potent_local, mlt_local, colat_local, 0, nmlon, nmlat, rc=localrc )
-    IF ( ipe_error_check( localrc, msg="call to Regrid_Potential failed", line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+    CALL eldyn % Regrid_Potential( &
+         grid, &
+         mpi_layer, &
+         time_tracker, &
+         potent_local, &
+         mlt_local, &
+         colat_local, &
+         0, nmlon, nmlat, rc=localrc )
+    IF ( ipe_error_check( localrc, msg="call to Regrid_Potential failed", &
+         line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
   END SUBROUTINE Empirical_E_Field_Wrapper
 
@@ -431,14 +440,17 @@ CONTAINS
 
 ! TWFANG modify the equation and add i_90km (May 2019)
 ! geographic eastward....
-        eldyn % v_exb_geographic(1,i_90km,lp,mp) = (eldyn % v_ExB_apex(1,lp,mp) * grid % apex_e_vectors(1,1,i_90km,lp,mp)) &
-                                                 + (eldyn % v_ExB_apex(2,lp,mp) * grid % apex_e_vectors(1,2,i_90km,lp,mp))
+            eldyn % v_exb_geographic(1,i_90km,lp,mp) = &
+                 (eldyn % v_ExB_apex(1,lp,mp) * grid % apex_e_vectors(1,1,i_90km,lp,mp)) &
+                 + (eldyn % v_ExB_apex(2,lp,mp) * grid % apex_e_vectors(1,2,i_90km,lp,mp))
 ! geographic northward....
-        eldyn % v_exb_geographic(2,i_90km,lp,mp) = (eldyn % v_ExB_apex(1,lp,mp) * grid % apex_e_vectors(2,1,i_90km,lp,mp)) &
-                                                 + (eldyn % v_ExB_apex(2,lp,mp) * grid % apex_e_vectors(2,2,i_90km,lp,mp))
+            eldyn % v_exb_geographic(2,i_90km,lp,mp) = &
+                 (eldyn % v_ExB_apex(1,lp,mp) * grid % apex_e_vectors(2,1,i_90km,lp,mp)) &
+                 + (eldyn % v_ExB_apex(2,lp,mp) * grid % apex_e_vectors(2,2,i_90km,lp,mp))
 ! geographic upwards....
-        eldyn % v_exb_geographic(3,i_90km,lp,mp) = (eldyn % v_ExB_apex(1,lp,mp) * grid % apex_e_vectors(3,1,i_90km,lp,mp)) &
-                                                 + (eldyn % v_ExB_apex(2,lp,mp) * grid % apex_e_vectors(3,2,i_90km,lp,mp))
+            eldyn % v_exb_geographic(3,i_90km,lp,mp) = &
+                 (eldyn % v_ExB_apex(1,lp,mp) * grid % apex_e_vectors(3,1,i_90km,lp,mp)) &
+                 + (eldyn % v_ExB_apex(2,lp,mp) * grid % apex_e_vectors(3,2,i_90km,lp,mp))
         ENDDO
 
       ENDDO
@@ -1072,17 +1084,40 @@ CONTAINS
 
     ! This subroutine is really just an interpolation routine to move a variable from one grid to the
     ! IPE grid.  It just fills in the electric_potential variable.
-    CALL eldyn % Regrid_Potential( grid,mpi_layer, time_tracker,ed1dy_map,xlonm_deg_map,ylatm_deg_map, 1, 82,kmlat, rc=localrc )
-    IF ( ipe_error_check( localrc, msg="call to Regrid_Potential (ed1dy_map) failed", line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+    CALL eldyn % Regrid_Potential( &
+         grid, mpi_layer, &
+         time_tracker, &
+         ed1dy_map, &
+         xlonm_deg_map, &
+         ylatm_deg_map, &
+         1, 82,kmlat, rc=localrc )
+    IF ( ipe_error_check( localrc, msg="call to Regrid_Potential (ed1dy_map) failed", &
+         line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
     eldyn % electric_field(1,:,:) = eldyn % electric_potential(:,grid % mp_low:grid % mp_high)
 
-    CALL eldyn % Regrid_Potential( grid,mpi_layer, time_tracker,ed2dy_map,xlonm_deg_map,ylatm_deg_map, 1, 82,kmlat, rc=localrc )
-    IF ( ipe_error_check( localrc, msg="call to Regrid_Potential (ed2dy_map) failed", line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+    CALL eldyn % Regrid_Potential( &
+         grid, &
+         mpi_layer, &
+         time_tracker, &
+         ed2dy_map, &
+         xlonm_deg_map, &
+         ylatm_deg_map, &
+         1, 82,kmlat, rc=localrc )
+    IF ( ipe_error_check( localrc, msg="call to Regrid_Potential (ed2dy_map) failed", &
+         line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
     eldyn % electric_field(2,:,:) = eldyn % electric_potential(:,grid % mp_low:grid % mp_high)
 
 
-    CALL eldyn % Regrid_Potential( grid, mpi_layer, time_tracker, pot_map, xlonm_deg_map,ylatm_deg_map, 1, 82,kmlat, rc=localrc )
-    IF ( ipe_error_check( localrc, msg="call to Regrid_Potential (ed2dy_map) failed", line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+    CALL eldyn % Regrid_Potential( &
+         grid, &
+         mpi_layer, &
+         time_tracker, &
+         pot_map, &
+         xlonm_deg_map, &
+         ylatm_deg_map, &
+         1, 82,kmlat, rc=localrc )
+    IF ( ipe_error_check( localrc, msg="call to Regrid_Potential (ed2dy_map) failed", &
+         line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
 
   END SUBROUTINE Dynamo_Wrapper

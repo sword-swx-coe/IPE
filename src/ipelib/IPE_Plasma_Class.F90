@@ -892,7 +892,8 @@ CONTAINS
         DO 200 lp = 1, perp_transport_max_lp
 
 
-          transport_convection_ratio(lp,mp) = (abs(v_ExB(1,lp,mp)*time_step/(r*sin( colat_90km(lp)))) * rad_to_deg) / longitude_spacing
+           transport_convection_ratio(lp,mp) = &
+                (abs(v_ExB(1,lp,mp)*time_step/(r*sin( colat_90km(lp)))) * rad_to_deg) / longitude_spacing
 !         write(7000 + mpi_layer % rank_id, *) mp , lp , transport_convection_ratio(lp,mp)
 
  200    CONTINUE
@@ -936,7 +937,11 @@ CONTAINS
     REAL(prec) :: ion_temperature_int
     REAL(prec) :: electron_temperature_int
     REAL(prec) :: r, B_int, max_phi, ksi_fac
-    REAL(prec) :: B(1:2,1:2), velocity(1:n_conv_spec,1:2,1:2), density(1:n_conv_spec,1:2,1:2), temperature(1:2,1:2), e_temperature(1:2,1:2)
+    REAL(prec) :: B(1:2,1:2)
+    REAL(prec) :: velocity(1:n_conv_spec,1:2,1:2)
+    REAL(prec) :: density(1:n_conv_spec,1:2,1:2)
+    REAL(prec) :: temperature(1:2,1:2)
+    REAL(prec) :: e_temperature(1:2,1:2)
     REAL(prec) :: coslam, sinim
     REAL(prec) :: z , z_factor
     INTEGER    :: lp_t0(1:2)
@@ -1187,17 +1192,21 @@ CONTAINS
                   B(lpx,mpx) = grid % magnetic_field_strength(isouth,lp_t0(lpx),mp_t0(mpx))*i_comp_weight(1) +&
                                grid % magnetic_field_strength(inorth,lp_t0(lpx),mp_t0(mpx))*i_comp_weight(2)
 
-                  density(1:n_conv_spec,lpx,mpx) = plasma % ion_densities_old(1:n_conv_spec,isouth,lp_t0(lpx),mp_t0(mpx))*i_comp_weight(1) +&
-                                                     plasma % ion_densities_old(1:n_conv_spec,inorth,lp_t0(lpx),mp_t0(mpx))*i_comp_weight(2)
+                  density(1:n_conv_spec,lpx,mpx) = &
+                       plasma % ion_densities_old(1:n_conv_spec,isouth,lp_t0(lpx),mp_t0(mpx))*i_comp_weight(1) +&
+                       plasma % ion_densities_old(1:n_conv_spec,inorth,lp_t0(lpx),mp_t0(mpx))*i_comp_weight(2)
 
-                  velocity(1:n_conv_spec,lpx,mpx) = plasma % ion_velocities_old(1:n_conv_spec,isouth,lp_t0(lpx),mp_t0(mpx))*i_comp_weight(1) +&
-                                                      plasma % ion_velocities_old(1:n_conv_spec,inorth,lp_t0(lpx),mp_t0(mpx))*i_comp_weight(2)
+                  velocity(1:n_conv_spec,lpx,mpx) = &
+                       plasma % ion_velocities_old(1:n_conv_spec,isouth,lp_t0(lpx),mp_t0(mpx))*i_comp_weight(1) +&
+                       plasma % ion_velocities_old(1:n_conv_spec,inorth,lp_t0(lpx),mp_t0(mpx))*i_comp_weight(2)
 
-                  temperature(lpx,mpx) = plasma % ion_temperature_old(isouth,lp_t0(lpx),mp_t0(mpx))*i_comp_weight(1) +&
-                                         plasma % ion_temperature_old(inorth,lp_t0(lpx),mp_t0(mpx))*i_comp_weight(2)
+                  temperature(lpx,mpx) = &
+                       plasma % ion_temperature_old(isouth,lp_t0(lpx),mp_t0(mpx))*i_comp_weight(1) +&
+                       plasma % ion_temperature_old(inorth,lp_t0(lpx),mp_t0(mpx))*i_comp_weight(2)
 
-                  e_temperature(lpx,mpx) = plasma % electron_temperature_old(isouth,lp_t0(lpx),mp_t0(mpx))*i_comp_weight(1) +&
-                                           plasma % electron_temperature_old(inorth,lp_t0(lpx),mp_t0(mpx))*i_comp_weight(2)
+                  e_temperature(lpx,mpx) = &
+                       plasma % electron_temperature_old(isouth,lp_t0(lpx),mp_t0(mpx))*i_comp_weight(1) +&
+                       plasma % electron_temperature_old(inorth,lp_t0(lpx),mp_t0(mpx))*i_comp_weight(2)
 
 
 
@@ -1216,11 +1225,15 @@ CONTAINS
                 DO lpx = 1, 2
                   B_int = B_int + B(lpx,mpx)*lp_comp_weight(lpx)*mp_comp_weight(mpx)
 
-                  ion_densities_int(1:n_conv_spec) = ion_densities_int(1:n_conv_spec) + density(1:n_conv_spec,lpx,mpx)*lp_comp_weight(lpx)*mp_comp_weight(mpx)
-                  ion_velocities_int(1:n_conv_spec) = ion_velocities_int(1:n_conv_spec) + velocity(1:n_conv_spec,lpx,mpx)*lp_comp_weight(lpx)*mp_comp_weight(mpx)
+                  ion_densities_int(1:n_conv_spec) = ion_densities_int(1:n_conv_spec) + &
+                       density(1:n_conv_spec,lpx,mpx)*lp_comp_weight(lpx)*mp_comp_weight(mpx)
+                  ion_velocities_int(1:n_conv_spec) = ion_velocities_int(1:n_conv_spec) + &
+                       velocity(1:n_conv_spec,lpx,mpx)*lp_comp_weight(lpx)*mp_comp_weight(mpx)
 
-                  ion_temperature_int = ion_temperature_int + temperature(lpx,mpx)*lp_comp_weight(lpx)*mp_comp_weight(mpx)
-                  electron_temperature_int = electron_temperature_int + e_temperature(lpx,mpx)*lp_comp_weight(lpx)*mp_comp_weight(mpx)
+                  ion_temperature_int = ion_temperature_int + &
+                       temperature(lpx,mpx)*lp_comp_weight(lpx)*mp_comp_weight(mpx)
+                  electron_temperature_int = electron_temperature_int + &
+                       e_temperature(lpx,mpx)*lp_comp_weight(lpx)*mp_comp_weight(mpx)
                 ENDDO
               ENDDO
 
@@ -1233,14 +1246,20 @@ CONTAINS
               z = grid % altitude(i,lp)/1000.0_prec
               if ((z.lt.200.0).and.(z.gt.100.0)) then
               z_factor = (z - 100.0) / 100.0
-              ion_densities_int(1:n_conv_spec) = (z_factor * (ion_densities_int(1:n_conv_spec) - plasma % ion_densities_old(1:n_conv_spec,i,lp,mp))) &
-                                               + plasma % ion_densities_old(1:n_conv_spec,i,lp,mp)
-              ion_velocities_int(1:n_conv_spec) = (z_factor * (ion_velocities_int(1:n_conv_spec) - plasma % ion_velocities_old(1:n_conv_spec,i,lp,mp))) &
-                                               + plasma % ion_velocities_old(1:n_conv_spec,i,lp,mp)
-              ion_temperature_int = (z_factor * (ion_temperature_int - plasma % ion_temperature_old(i,lp,mp))) &
-                                               + plasma % ion_temperature_old(i,lp,mp)
-              electron_temperature_int = (z_factor * (electron_temperature_int - plasma % electron_temperature_old(i,lp,mp))) &
-                                               + plasma % electron_temperature_old(i,lp,mp)
+              ion_densities_int(1:n_conv_spec) = &
+                   (z_factor * (ion_densities_int(1:n_conv_spec) - &
+                   plasma % ion_densities_old(1:n_conv_spec,i,lp,mp))) &
+                   + plasma % ion_densities_old(1:n_conv_spec,i,lp,mp)
+              ion_velocities_int(1:n_conv_spec) = &
+                   (z_factor * (ion_velocities_int(1:n_conv_spec) - &
+                   plasma % ion_velocities_old(1:n_conv_spec,i,lp,mp))) &
+                   + plasma % ion_velocities_old(1:n_conv_spec,i,lp,mp)
+              ion_temperature_int = &
+                   (z_factor * (ion_temperature_int - plasma % ion_temperature_old(i,lp,mp))) &
+                   + plasma % ion_temperature_old(i,lp,mp)
+              electron_temperature_int = &
+                   (z_factor * (electron_temperature_int - plasma % electron_temperature_old(i,lp,mp))) &
+                   + plasma % electron_temperature_old(i,lp,mp)
               endif
               if (z.lt.100.0) then
                  ion_densities_int(1:n_conv_spec) = plasma % ion_densities_old(1:n_conv_spec,i,lp,mp)
@@ -2033,7 +2052,10 @@ CONTAINS
 
 !! get pedersen & hall conductivities
 !! more ion spieces can be added for calculating electron density
-               electron_density = plasma % ion_densities(1,i,lp,mp) + plasma % ion_densities(5,i,lp,mp) + plasma % ion_densities(6,i,lp,mp)
+              electron_density = &
+                   plasma % ion_densities(1,i,lp,mp) + &
+                   plasma % ion_densities(5,i,lp,mp) + &
+                   plasma % ion_densities(6,i,lp,mp)
 !              electron_density = plasma % ion_densities(1,i,lp,mp) + plasma % ion_densities(5,i,lp,mp) + plasma % ion_densities(6,i,lp,mp)+ &
 !                                 plasma % ion_densities(2,i,lp,mp) + plasma % ion_densities(3,i,lp,mp) + plasma % ion_densities(4,i,lp,mp)+ &
 !                                 plasma % ion_densities(7,i,lp,mp)
