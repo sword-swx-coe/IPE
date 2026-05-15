@@ -163,23 +163,29 @@ class IPE:
       dt_sec = (t - datetime(1965,1,1)).total_seconds()
       time_out[0] = dt_sec
 
-      z_var = o.createVariable('z',  'f4', 'z')
+      # Modify these to provide 3D data to be consistent with
+      # GITM / Aether results
+      z_var = o.createVariable('z',  'f4', ('lon','lat','z'))
       z_var.long_name = 'Altitude'
       z_var.units     = 'km'
 
-      y_var = o.createVariable('lat',  'f4', 'lat')
+      y_var = o.createVariable('lat', 'f4', ('lon','lat','z'))
       y_var.long_name = 'Latitude'
       y_var.units     = 'degrees_north'
 
-      x_var = o.createVariable('lon', 'f4', 'lon')
+      x_var = o.createVariable('lon', 'f4', ('lon','lat','z'))
       x_var.long_name = 'Longitude'
       x_var.units     = 'degrees_east'
 
       # Variables
-      op_var   = o.createVariable('o_plus',               'f4', ('lon','lat','z'))
+      e_var   = o.createVariable('e-', 'f4', ('lon','lat','z'))
+      e_var.long_name = "electron number density"
+      e_var.units     = "m^{-3}"
+
+      op_var   = o.createVariable('o_plus', 'f4', ('lon','lat','z'))
       op_var.long_name = "O+ number density"
       op_var.units     = "m^{-3}"
-
+      
       hp_var   = o.createVariable('h_plus',               'f4', ('lon','lat','z'))
       hp_var.long_name = "H+ number density"
       hp_var.units     = "m^{-3}"
@@ -272,19 +278,59 @@ class IPE:
       et_var.long_name = "Electron temperature"
       et_var.units     = "K"
 
-      z_var[:] = self.grid.altitude_geo
-      y_var[:] = self.grid.latitude_geo
-      x_var[:] = self.grid.longitude_geo
+      nLons = len(self.grid.longitude_geo)
+      nLats = len(self.grid.latitude_geo)
+      nAlts = len(self.grid.altitude_geo)
 
-      op_var[:]   = self.grid.interpolate_to_geogrid(self.plasma.ion_densities[0])
-      hp_var[:]   = self.grid.interpolate_to_geogrid(self.plasma.ion_densities[1])
-      hep_var[:]  = self.grid.interpolate_to_geogrid(self.plasma.ion_densities[2])
-      np_var[:]   = self.grid.interpolate_to_geogrid(self.plasma.ion_densities[3])
-      nop_var[:]  = self.grid.interpolate_to_geogrid(self.plasma.ion_densities[4])
-      o2p_var[:]  = self.grid.interpolate_to_geogrid(self.plasma.ion_densities[5])
-      n2p_var[:]  = self.grid.interpolate_to_geogrid(self.plasma.ion_densities[6])
-      op2d_var[:] = self.grid.interpolate_to_geogrid(self.plasma.ion_densities[7])
-      op2p_var[:] = self.grid.interpolate_to_geogrid(self.plasma.ion_densities[8])
+      lons3d = np.zeros((nLons, nLats, nAlts))
+      lats3d = np.zeros((nLons, nLats, nAlts))
+      alts3d = np.zeros((nLons, nLats, nAlts))
+      electron = np.zeros((nLons, nLats, nAlts))
+
+      for iLon in range(nLons):
+        for iLat in range(nLats):
+          alts3d[iLon, iLat, :] = self.grid.altitude_geo * 1000.0
+      for iLon in range(nLons):
+        for iAlt in range(nAlts):
+          lats3d[iLon, :, iAlt] = self.grid.latitude_geo
+      for iLat in range(nLats):
+        for iAlt in range(nAlts):
+          lons3d[:, iLat, iAlt] = self.grid.longitude_geo
+          
+      z_var[:] = alts3d
+      y_var[:] = lats3d
+      x_var[:] = lons3d
+
+      op = self.grid.interpolate_to_geogrid(self.plasma.ion_densities[0])
+      op_var[:] = op
+
+      hp = self.grid.interpolate_to_geogrid(self.plasma.ion_densities[1])
+      hp_var[:] = hp
+      
+      hep = self.grid.interpolate_to_geogrid(self.plasma.ion_densities[2])
+      hep_var[:] = hep
+
+      n1p   = self.grid.interpolate_to_geogrid(self.plasma.ion_densities[3])
+      np_var[:] = n1p
+
+      nop  = self.grid.interpolate_to_geogrid(self.plasma.ion_densities[4])
+      nop_var[:] = nop
+
+      o2p  = self.grid.interpolate_to_geogrid(self.plasma.ion_densities[5])
+      o2p_var[:] = o2p
+
+      n2p  = self.grid.interpolate_to_geogrid(self.plasma.ion_densities[6])
+      n2p_var[:] = n2p
+
+      op2d = self.grid.interpolate_to_geogrid(self.plasma.ion_densities[7])
+      op2d_var[:] = op2d
+
+      op2p = self.grid.interpolate_to_geogrid(self.plasma.ion_densities[8])
+      op2p_var[:] = op2p
+
+      electron = op + hp 
+      e_var[:] = electron
+
       he_var[:]   = self.grid.interpolate_to_geogrid(self.neutral.helium)
       o_var[:]    = self.grid.interpolate_to_geogrid(self.neutral.oxygen)
       o2_var[:]   = self.grid.interpolate_to_geogrid(self.neutral.molecular_oxygen)
@@ -336,8 +382,7 @@ grid_file = path.join(args.indir, 'IPE_Grid.nc') if args.gridfile is None else a
 
 # Read in grid, find input files
 ipe = IPE(grid_file)
-files = glob.glob(path.join(args.indir,"IPE_State.apex.*"))
-
+files = sorted(glob.glob(path.join(args.indir,"IPE_State.apex.*")))
 
 if args.nprocs > 1:
   p = Pool(min([len(files),args.nprocs]))
@@ -347,6 +392,6 @@ else:
     load_and_write(iFile)
 
 # Remove files if we are not told to -keep them
-if not args.keep:
-  for eachFile in files:
-    remove(eachFile)
+#if not args.keep:
+#  for eachFile in files:
+#    remove(eachFile)
