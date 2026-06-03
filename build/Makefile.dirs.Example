@@ -12,6 +12,7 @@ RUNDIR = ${BASEDIR}/run
 DATADIR = ${BASEDIR}/srcData
 
 MILEDIR = ${BASEDIR}/ext/Electrodynamics
+IODIR = ${BASEDIR}/ext/srcIndices
 
 FLIPDIR = ${BASEDIR}/src/ipelib/flip
 MSISDIR = ${BASEDIR}/src/ipelib/msise00
