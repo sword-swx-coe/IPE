@@ -13,7 +13,12 @@ MODULE IPE_Model_Parameters_Class
   ! Max characters per line. In component mode, must match
   ! share/Library/src/ModReadParam.f90 :: lStringLine
   integer, parameter :: iCharLen_ = 600
+  integer, parameter :: nLinesMax_ = 10000
+  integer :: nLines, iError
   integer, parameter :: nAmieFilesMax = 10
+
+  character(iCharLen_), dimension(nLinesMax_) :: cInputFileBuffer
+  character(iCharLen_) :: line
   
   TYPE IPE_Model_Parameters
 
@@ -361,41 +366,90 @@ CONTAINS
       IF ( ipe_iostatus_check( iostatus, &
            line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
-      READ( UNIT = fUnit, NML = SpaceManagement, IOSTAT = iostatus )
-      IF ( ipe_iostatus_check( iostatus, &
-           line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+     ! --------------------------------------------------------
+     ! Test hack to see if we can read in a whole file into
+     ! a character string and then read the namelists from
+     ! there, so we don't have to make a bunch of buffer arrays
 
-      READ( UNIT = fUnit, NML = TimeStepping, IOSTAT = iostatus )
-      IF ( ipe_iostatus_check( iostatus, &
-           line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+     do nLines = 1, nLinesMax_
+          cInputFileBuffer(nLines) = ""
+     enddo
 
-      READ( UNIT = fUnit, NML = Forcing, IOSTAT = iostatus )
-      IF ( ipe_iostatus_check( iostatus, &
-           line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+     iError = 0
+     nLines = 1
+     do while (iError == 0)
 
-      READ( UNIT = fUnit, NML = FileIO, IOSTAT = iostatus )
-      IF ( ipe_iostatus_check( iostatus, &
-           line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+          read(fUnit, '(a)', iostat=iError) line
 
-      READ( UNIT = fUnit, NML = IPECAP, IOSTAT = iostatus )
-      IF ( ipe_iostatus_check( iostatus, &
-           line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+          if (nLines > nLinesMax_) then
+               write(*,*) "Reading input file is bad... Too many lines"
+          endif
+          cInputFileBuffer(nLines) = line
+          nLines = nLines + 1
 
-      READ( UNIT = fUnit, NML = ElDyn, IOSTAT = iostatus )
-      IF ( ipe_iostatus_check( iostatus, &
-           line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+     enddo
 
-      READ( UNIT = fUnit, NML = Operational, IOSTAT = iostatus )
-      IF ( ipe_iostatus_check( iostatus, &
-           line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
-
-      READ( UNIT = fUnit, NML = MILE, IOSTAT = iostatus )
+      REWIND( UNIT = fUnit, IOSTAT = iostatus )
       IF ( ipe_iostatus_check( iostatus, &
            line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
       CLOSE( fUnit, IOSTAT = iostatus )
       IF ( ipe_iostatus_check( iostatus, &
            line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+           
+   ENDIF
+
+#ifdef HAVE_MPI
+   CALL MPI_BCAST( &
+        cInputFileBuffer, iCharLen_ * nLinesMax_, MPI_CHAR, 0, &
+        mpi_layer % mpi_communicator, ierr )
+   IF ( ipe_status_check( ierr == 0, &
+        line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+#endif
+
+
+
+      READ(cInputFileBuffer, NML = SpaceManagement, IOSTAT = iostatus )
+      READ(cInputFileBuffer, NML = TimeStepping, IOSTAT = iostatus )
+      READ(cInputFileBuffer, NML = Forcing, IOSTAT = iostatus )
+      READ(cInputFileBuffer, NML = FileIO, IOSTAT = iostatus )
+      READ(cInputFileBuffer, NML = IPECAP, IOSTAT = iostatus )
+      READ(cInputFileBuffer, NML = ElDyn, IOSTAT = iostatus )
+      READ(cInputFileBuffer, NML = Operational, IOSTAT = iostatus )
+      READ(cInputFileBuffer, NML = MILE, IOSTAT = iostatus )
+
+
+      !READ( UNIT = fUnit, NML = SpaceManagement, IOSTAT = iostatus )
+      !IF ( ipe_iostatus_check( iostatus, &
+      !     line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+
+      !READ( UNIT = fUnit, NML = TimeStepping, IOSTAT = iostatus )
+      !IF ( ipe_iostatus_check( iostatus, &
+      !     line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+
+      !READ( UNIT = fUnit, NML = Forcing, IOSTAT = iostatus )
+      !IF ( ipe_iostatus_check( iostatus, &
+      !     line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+
+      !READ( UNIT = fUnit, NML = FileIO, IOSTAT = iostatus )
+      !IF ( ipe_iostatus_check( iostatus, &
+      !     line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+
+      !READ( UNIT = fUnit, NML = IPECAP, IOSTAT = iostatus )
+      !IF ( ipe_iostatus_check( iostatus, &
+      !     line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+
+      !READ( UNIT = fUnit, NML = ElDyn, IOSTAT = iostatus )
+      !IF ( ipe_iostatus_check( iostatus, &
+      !     line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+
+      !READ( UNIT = fUnit, NML = Operational, IOSTAT = iostatus )
+      !IF ( ipe_iostatus_check( iostatus, &
+      !     line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+
+      !READ( UNIT = fUnit, NML = MILE, IOSTAT = iostatus )
+      !IF ( ipe_iostatus_check( iostatus, &
+      !     line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
       IF ( LEN_TRIM( f107_kp_file ) > 0 ) THEN
          INQUIRE( FILE = TRIM( f107_kp_file ), &
@@ -405,26 +459,65 @@ CONTAINS
               line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
       ENDIF
 
-      ! prepare buffers
-      ! -- strings
-      sbuf(1) = grid_file
-      sbuf(2) = initial_timestamp
-      sbuf(3) = f107_kp_file
-      sbuf(4) = mesh_write_file
-      sbuf(5) = file_prefix
-      sbuf(6) = file_extension
-      sbuf(7) = input_file_dir
+      ! -- reals
+      rbuf = &
+           (/ time_step, start_time, end_time, msis_time_step, &
+           solar_forcing_time_step, &
+           mesh_height_min, mesh_height_max, &
+           f107, f107_81day_avg, kp, kp_1day_avg, ap,   &
+           ap_1day_avg, nhemi_power, shemi_power, &
+           solarwind_By, solarwind_angle,          &
+           solarwind_velocity, solarwind_Bz, solarwind_density, &
+           file_output_frequency, &
+           colfac, offset1_deg, offset2_deg, hpeq, vertical_wind_limit /)
 
-      ! MILE string buffer:
-      sbufMile(1) = mile_efield
-      sbufMile(2) = mile_aurora
-      sbufMile(3) = mile_dir
-      sbufMile(4) = amiefilenorth
-      sbufMile(5) = amiefilesouth
-      do iFile = 1, nAmieFilesMax
-         sbufMile(6 + (iFile - 1) * 2) = cAmieListNorth(iFile)
-         sbufMile(6 + (iFile - 1) * 2 + 1) = cAmieListSouth(iFile)
-      enddo
+!   ENDIF
+!
+!#ifdef HAVE_MPI
+!   CALL MPI_BCAST( &
+!        sbuf, 200 * size(sbuf), MPI_CHAR, 0, &
+!        mpi_layer % mpi_communicator, ierr )
+!   IF ( ipe_status_check( ierr == 0, &
+!        line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+!#endif
+
+   params % grid_file = grid_file
+   params % initial_timestamp = initial_timestamp
+   params % f107_kp_file = f107_kp_file
+   params % mesh_write_file = mesh_write_file
+   params % file_prefix = file_prefix
+   params % file_extension = file_extension
+   params % input_file_dir = input_file_dir
+   if ( mpi_layer % rank_id == 0 ) &
+     write(*,*) '-> Setting input directory to -->', &
+     trim(params % input_file_dir), '<--'
+
+!#ifdef HAVE_MPI
+!   CALL MPI_BCAST( &
+!        sbufMile, iCharLen_ * size(sbufMile), MPI_CHAR, 0, &
+!        mpi_layer % mpi_communicator, ierr )
+!   IF ( ipe_status_check( ierr == 0, &
+!        line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+!#endif
+
+   ! Put MILE settings into params:
+   params % mile_efield = mile_efield
+   params % mile_aurora = mile_aurora
+   params % mile_dir = mile_dir
+   params % amiefilenorth = amiefilenorth
+   params % amiefilesouth = amiefilesouth
+   do iFile = 1, nAmieFilesMax
+      params % cAmieListNorth(iFile) = cAmieListNorth(iFile)
+      params % cAmieListSouth(iFile) = cAmieListSouth(iFile)
+   enddo
+
+!#ifdef HAVE_MPI
+!   CALL MPI_BCAST( &
+!        ibuf, size(ibuf), MPI_INTEGER, 0, &
+!        mpi_layer % mpi_communicator, ierr )
+!   IF ( ipe_status_check( ierr == 0, &
+!        line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+!#endif
 
       ! -- integers
       ibuf(1:15) = &
@@ -451,137 +544,78 @@ CONTAINS
       ibuf(29) = nAmieFilesNorth
       ibuf(30) = nAmieFilesSouth
 
-      ! -- reals
-      rbuf = &
-           (/ time_step, start_time, end_time, msis_time_step, &
-           solar_forcing_time_step, &
-           mesh_height_min, mesh_height_max, &
-           f107, f107_81day_avg, kp, kp_1day_avg, ap,   &
-           ap_1day_avg, nhemi_power, shemi_power, &
-           solarwind_By, solarwind_angle,          &
-           solarwind_velocity, solarwind_Bz, solarwind_density, &
-           file_output_frequency, &
-           colfac, offset1_deg, offset2_deg, hpeq, vertical_wind_limit /)
 
-   ENDIF
-
-#ifdef HAVE_MPI
-   CALL MPI_BCAST( &
-        sbuf, 200 * size(sbuf), MPI_CHAR, 0, &
-        mpi_layer % mpi_communicator, ierr )
-   IF ( ipe_status_check( ierr == 0, &
-        line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
-#endif
-
-   params % grid_file         = sbuf(1)
-   params % initial_timestamp = sbuf(2)
-   params % f107_kp_file      = sbuf(3)
-   params % mesh_write_file   = sbuf(4)
-   params % file_prefix       = sbuf(5)
-   params % file_extension    = sbuf(6)
-   params % input_file_dir    = sbuf(7)
-   IF ( mpi_layer % rank_id == 0 ) &
-     write(*,*) '-> Setting input directory to -->', &
-     trim(params % input_file_dir), '<--'
-
-#ifdef HAVE_MPI
-   CALL MPI_BCAST( &
-        sbufMile, iCharLen_ * size(sbufMile), MPI_CHAR, 0, &
-        mpi_layer % mpi_communicator, ierr )
-   IF ( ipe_status_check( ierr == 0, &
-        line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
-#endif
-
-   ! Put MILE settings into params:
-   params % mile_efield = sbufMile(1) 
-   params % mile_aurora = sbufMile(2)
-   params % mile_dir = sbufMile(3)
-   params % amiefilenorth = sbufMile(4)
-   params % amiefilesouth = sbufMile(5)
-   !do iFile = 1, nAmieFilesMax
-   !   params % cAmieListNorth(iFile) = sbufMile(6 + (iFile - 1) * 2)
-   !   params % cAmieListSouth(iFile) = sbufMile(6 + (iFile - 1) * 2 + 1)
-   !enddo
-
-#ifdef HAVE_MPI
-   CALL MPI_BCAST( &
-        ibuf, size(ibuf), MPI_INTEGER, 0, &
-        mpi_layer % mpi_communicator, ierr )
-   IF ( ipe_status_check( ierr == 0, &
-        line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
-#endif
-
-   params % f107_kp_size              = ibuf(1)
-   params % f107_kp_interval          = ibuf(2)
-   params % f107_kp_skip_size         = ibuf(3)
-   params % f107_kp_realtime_interval = ibuf(4)
-   params % f107_kp_data_size         = ibuf(5)
-   params % f107_kp_read_in_start     = ibuf(6)
-   params % mesh_fill                 = ibuf(7)
-   params % mesh_write                = ibuf(8)
-   params % import_write              = ibuf(9)
-   params % export_write              = ibuf(10)
-   params % f107_flag                 = ibuf(11)
-   params % kp_flag                   = ibuf(12)
-   params % ap_flag                   = ibuf(13)
-   params % nhemi_power_index         = ibuf(14)
-   params % shemi_power_index         = ibuf(15)
-   params % read_apex_neutrals        = ( ibuf(16) == 1 )
-   params % read_geographic_neutrals  = ( ibuf(17) == 1 )
-   params % write_apex_neutrals       = ( ibuf(18) == 1 )
-   params % write_geographic_neutrals = ( ibuf(19) == 1 )
-   params % write_geographic_eldyn    = ( ibuf(20) == 1 )
-   params % write_apex_eldyn          = ( ibuf(21) == 1 )
-   params % use_f107_kp_file          = ( ibuf(22) == 1 )
-   params % dynamo_efield             = ( ibuf(23) == 1 )
-   params % ipe_has_import            = ( ibuf(24) == 1 )
-   params % potential_model           = ibuf(25)
-   params % transport_highlat_lp      = ibuf(26)
-   params % perp_transport_max_lp     = ibuf(27)
+   params % f107_kp_size             = f107_kp_size
+   params % f107_kp_interval          = f107_kp_interval
+   params % f107_kp_skip_size         = f107_kp_skip_size
+   params % f107_kp_realtime_interval = f107_kp_realtime_interval
+   params % f107_kp_data_size         = f107_kp_data_size
+   params % f107_kp_read_in_start     = f107_kp_read_in_start
+   params % mesh_fill                 = mesh_fill
+   params % mesh_write                = mesh_write
+   params % import_write              = import_write
+   params % export_write              = export_write
+   params % f107_flag                 = f107_flag
+   params % kp_flag                   = kp_flag
+   params % ap_flag                   = ap_flag
+   params % nhemi_power_index         = nhemi_power_index
+   params % shemi_power_index         = shemi_power_index
+   params % read_apex_neutrals        = read_apex_neutrals
+   params % read_geographic_neutrals  = read_geographic_neutrals
+   params % write_apex_neutrals       = write_apex_neutrals
+   params % write_geographic_neutrals = write_geographic_neutrals
+   params % write_geographic_eldyn    = write_geographic_eldyn
+   params % write_apex_eldyn          = write_apex_eldyn
+   params % use_f107_kp_file          = .true.
+   params % dynamo_efield             = dynamo_efield
+   params % ipe_has_import            = ipe_has_import
+   params % potential_model           = potential_model
+   params % transport_highlat_lp      = transport_highlat_lp
+   params % perp_transport_max_lp     = perp_transport_max_lp
    IF ( mpi_layer % rank_id == 0 ) THEN
-      params % mile_verbose = ibuf(28)
-      iMileVerbose = ibuf(28)
+      params % mile_verbose = mile_verbose
+      iMileVerbose = mile_verbose
    else
       params % mile_verbose = -1
       iMileVerbose = -1
    endif
-   params % nAmieFilesNorth = ibuf(29)
-   params % nAmieFilesSouth = ibuf(30)
+   params % nAmieFilesNorth = nAmieFilesNorth
+   params % nAmieFilesSouth = nAmieFilesSouth
    
-#ifdef HAVE_MPI
-   CALL MPI_BCAST( &
-        rbuf, size(rbuf), mpi_layer % mpi_prec, 0, &
-        mpi_layer % mpi_communicator, ierr )
-   IF ( ipe_status_check( ierr == 0, &
-        line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
-#endif
+!#ifdef HAVE_MPI
+!   CALL MPI_BCAST( &
+!        rbuf, size(rbuf), mpi_layer % mpi_prec, 0, &
+!        mpi_layer % mpi_communicator, ierr )
+!   IF ( ipe_status_check( ierr == 0, &
+!        line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+!#endif
 
-   params % time_step               = rbuf(1)
-   params % start_time              = rbuf(2)
-   params % end_time                = rbuf(3)
-   params % msis_time_step          = rbuf(4)
-   params % solar_forcing_time_step = rbuf(5)
-   params % mesh_height_min         = km_to_m * rbuf(6)
-   params % mesh_height_max         = km_to_m * rbuf(7)
-   params % f107                    = rbuf(8)
-   params % f107_81day_avg          = rbuf(9)
-   params % kp                      = rbuf(10)
-   params % kp_1day_avg             = rbuf(11)
-   params % ap                      = rbuf(12)
-   params % ap_1day_avg             = rbuf(13)
-   params % nhemi_power             = rbuf(14)
-   params % shemi_power             = rbuf(15)
-   params % solarwind_By            = rbuf(16)
-   params % solarwind_angle         = rbuf(17)
-   params % solarwind_velocity      = rbuf(18)
-   params % solarwind_Bz            = rbuf(19)
-   params % solarwind_density       = rbuf(20)
-   params % file_output_frequency   = rbuf(21)
-   params % colfac                  = rbuf(22)
-   params % offset1_deg             = rbuf(23)
-   params % offset2_deg             = rbuf(24)
-   params % hpeq                    = rbuf(25)
-   params % vertical_wind_limit     = rbuf(26)
+   params % time_step               = time_step
+   params % start_time              = start_time
+   params % end_time                = end_time
+   params % msis_time_step          = msis_time_step
+   params % solar_forcing_time_step = solar_forcing_time_step
+   params % mesh_height_min         = km_to_m * mesh_height_min
+   params % mesh_height_max         = km_to_m * mesh_height_max
+   params % f107                    = f107
+   params % f107_81day_avg          = f107_81day_avg
+   params % kp                      = kp
+   params % kp_1day_avg             = kp_1day_avg
+   params % ap                      = ap
+   params % ap_1day_avg             = ap_1day_avg
+   params % nhemi_power             = nhemi_power
+   params % shemi_power             = shemi_power
+   params % solarwind_By            = solarwind_By
+   params % solarwind_angle         = solarwind_angle
+   params % solarwind_velocity      = solarwind_velocity
+   params % solarwind_Bz            = solarwind_Bz
+   params % solarwind_density       = solarwind_density
+   params % file_output_frequency   = file_output_frequency
+   params % colfac                  = colfac
+   params % offset1_deg             = offset1_deg
+   params % offset2_deg             = offset2_deg
+   params % hpeq                    = hpeq
+   params % vertical_wind_limit     = vertical_wind_limit
 
    params % n_model_updates = &
         INT( ( params % end_time - params % start_time ) / &
