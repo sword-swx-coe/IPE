@@ -21,7 +21,7 @@ ${EXE}:	${OBJECTS_EXE}
 		-L${LIBDIR} ${LIBRARYDIR} \
 		-o ${EXE} ${OBJECTS_EXE} \
 		-lIPE -lEfield -lDynamo -lFlip -lMsise -lShared \
-		-L${MILEDIR}/lib -lIE \
+		-L${MILEDIR}/lib -lIE -lIO \
 		${Lflag1}  ${LIBRARIES}
 
 LIB:
