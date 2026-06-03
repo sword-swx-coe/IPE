@@ -300,7 +300,11 @@ CONTAINS
     real :: HPn, HPs
 
     IF ( PRESENT( rc ) ) rc = IPE_SUCCESS
-    
+
+    ! Initialize output variables to zero
+    plasma % aurora_eflux2d = 0.0
+    plasma % aurora_avee2d = 0.0
+
     CALL plasma % Test_Transport_Time_step( &
          grid, v_ExB, time_step, mpi_layer, &
          max_transport_convection_ratio_local, &
@@ -953,65 +957,66 @@ CONTAINS
     REAL(prec), PARAMETER :: rad_to_deg = 57.295779513
     CHARACTER(len=128) :: errmsg
 
-      rc = IPE_SUCCESS
+    rc = IPE_SUCCESS
 
-      CALL plasma % Calculate_Pole_Values( grid,                       &
-                                           mpi_layer,                  &
-                                           ion_densities_pole_value,   &
-                                           ion_temperature_pole_value, &
-                                           ion_velocities_pole_value,  &
-                                           electron_temperature_pole_value )
-
-
-      colat_90km(1:grid % NLP) = grid % magnetic_colatitude(1,1:grid % NLP)
-      r = earth_radius + 90000.0_prec
-
-      DO 100 mp = plasma % mp_low, plasma % mp_high
-        DO 200 lp = 1, perp_transport_max_lp
-
-          i_convection_too_far_in_lp = .FALSE.
-
-          if (abs(sin( colat_90km(lp) )) > 1.0e-15_prec) then
-             phi_t0   = grid % magnetic_longitude(mp) - v_ExB(1,lp,mp)*time_step/(r*sin( colat_90km(lp) ) )
-          else
-             phi_t0 = grid % magnetic_longitude(mp)
-          endif
-
-          coslam = cos( half_pi - grid % magnetic_colatitude(1,lp) )
-          sinim  = 2.0_prec*sqrt( 1.0_prec - coslam*coslam )/sqrt( 4.0_prec - 3.0_prec*coslam*coslam )
-          if (abs(sinim) > 1.0e-15_prec) then
-             theta_t0 = colat_90km(lp) - v_ExB(2,lp,mp)*time_step/(r*sinim)
-          else
-             theta_t0 = colat_90km(lp)
-          endif
-
-          ! If a Lagrangian trajectory crosses the equator, we clip the colatitude
-          ! so that the point resides at the equator.
-          IF( theta_t0 > colat_90km( grid % NLP ) )THEN ! NLP ==> Equator
-            theta_t0 = colat_90km( grid % NLP )
-          ENDIF
+    CALL plasma % Calculate_Pole_Values( grid,                       &
+                                         mpi_layer,                  &
+                                         ion_densities_pole_value,   &
+                                         ion_temperature_pole_value, &
+                                         ion_velocities_pole_value,  &
+                                         electron_temperature_pole_value )
 
 
+    colat_90km(1:grid % NLP) = grid % magnetic_colatitude(1,1:grid % NLP)
+    r = earth_radius + 90000.0_prec
 
-          ! lp_min is the nearest point to theta_t0 that has a larger colat value
-          lp_min = 0
-          IF( lp == 1 )THEN
-            ! Check poleward
-            IF( theta_t0 < colat_90km(1) )THEN
-              lp_min = 1
-            ELSE
-              lp_min = 2
-            ENDIF
+    DO 100 mp = plasma % mp_low, plasma % mp_high
+      DO 200 lp = 1, perp_transport_max_lp
 
+        i_convection_too_far_in_lp = .FALSE.
+
+        ! Calculate the latitude (theta) and longitude (phi) of the point where
+        ! the plasma came from
+
+        if (abs(sin( colat_90km(lp) )) > 1.0e-15_prec) then
+            phi_t0 = grid % magnetic_longitude(mp) - v_ExB(1,lp,mp)*time_step/(r*sin( colat_90km(lp) ) )
+        else
+            phi_t0 = grid % magnetic_longitude(mp)
+        endif
+
+        coslam = cos( half_pi - grid % magnetic_colatitude(1,lp) )
+        sinim  = 2.0_prec*sqrt( 1.0_prec - coslam*coslam )/sqrt( 4.0_prec - 3.0_prec*coslam*coslam )
+        if (abs(sinim) > 1.0e-15_prec) then
+            theta_t0 = colat_90km(lp) - v_ExB(2,lp,mp)*time_step/(r*sinim)
+        else
+            theta_t0 = colat_90km(lp)
+        endif
+
+        ! If a Lagrangian trajectory crosses the equator, we clip the colatitude
+        ! so that the point resides at the equator.
+        IF (theta_t0 > colat_90km( grid % NLP )) THEN ! NLP ==> Equator
+          theta_t0 = colat_90km( grid % NLP )
+        ENDIF
+
+        ! lp_min is the nearest point to theta_t0 that has a larger colat value
+        lp_min = 0
+        IF( lp == 1 )THEN
+          ! Check poleward
+          IF (theta_t0 < colat_90km(1)) THEN
+            lp_min = 1
           ELSE
-            ! Check poleward
-            IF( theta_t0 <= colat_90km(lp) .AND. theta_t0 >= colat_90km(lp-1) )THEN
-              lp_min = lp
-            ! Check equatorward
-            ELSEIF( theta_t0 <= colat_90km(lp+1) .AND. theta_t0 >= colat_90km(lp) )THEN
-              lp_min = lp+1
-            ENDIF
+            lp_min = 2
           ENDIF
+
+        ELSE
+          ! Check poleward
+          IF( theta_t0 <= colat_90km(lp) .AND. theta_t0 >= colat_90km(lp-1) )THEN
+            lp_min = lp
+          ! Check equatorward
+          ELSEIF( theta_t0 <= colat_90km(lp+1) .AND. theta_t0 >= colat_90km(lp) )THEN
+            lp_min = lp+1
+          ENDIF
+        ENDIF
 
           IF( lp_min == 0 )THEN
 
@@ -1063,6 +1068,8 @@ CONTAINS
             i_convection_too_far_in_lp = .TRUE.
             write(errmsg,*) 'GHGM convection too far ', mp , lp
             CALL ipe_warning_log( msg=errmsg, line=__LINE__, file=__FILE__ )
+            write(*,*) '  -> theta_t0(deg), colat (deg), ExB : ', theta_t0*180/3.14, colat_90km(lp)*180/3.14, v_ExB(2,lp,mp)
+
           ENDIF
 
 ! GHGM - check that lp_min is not greater than NLP
@@ -1532,6 +1539,10 @@ CONTAINS
                ! Just overwrite these for now.  Need south values too.
                eflux = eflux2d(iMlt, lp)
                ch = avee2d(iMlt, lp) / 2
+            else
+               plasma % aurora_eflux2d(lp, mp) = eflux
+               plasma % aurora_avee2d(lp, mp) = ch * 2
+
             endif
 #endif
             
@@ -1858,7 +1869,8 @@ CONTAINS
 
           IF ( CTIP_CHECK_EFLAG( ERRMSG, EFLAG ) ) THEN
             write(mp_lp_string,"(2i4)") mp,lp
-            CALL ipe_warning_log( msg=trim(ERRMSG)//trim(mp_lp_string), line=__LINE__, file=__FILE__ )
+            CALL ipe_warning_log( msg = trim(ERRMSG)//" -> iMlt(mp) iLat(lp) = "//trim(mp_lp_string), &
+              line=__LINE__, file=__FILE__ )
           ENDIF
 
           DO i=1, grid % flux_tube_max(lp)
@@ -1866,9 +1878,9 @@ CONTAINS
             ! Ion Densities
             plasma % ion_densities(1:9,i,lp,mp) = XIONNX(1:9,i)
             ! Electron Density
-!           plasma % electron_density(i,lp,mp) = XIONNX(1,i) + XIONNX(2,i) + XIONNX(3,i) + XIONNX(4,i) + XIONNX(5,i) + XIONNX(6,i) + XIONNX(7,i) + XIONNX(8,i) + XIONNX(9,i)
-! Just make electron density be Oplus + Hplus for now
-            plasma % electron_density(i,lp,mp) = XIONNX(1,i) + XIONNX(2,i)
+            plasma % electron_density(i,lp,mp) = XIONNX(1,i) + XIONNX(2,i) + XIONNX(3,i) + XIONNX(4,i) + XIONNX(5,i) + XIONNX(6,i) + XIONNX(7,i) + XIONNX(8,i) + XIONNX(9,i)
+            ! Just make electron density be Oplus + Hplus for now
+            ! plasma % electron_density(i,lp,mp) = XIONNX(1,i) + XIONNX(2,i)
             ! Along Flux Tube Ion Velocities
             plasma % ion_velocities(1:9,i,lp,mp) = XIONVX(1:9,i)
 
