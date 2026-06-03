@@ -9,6 +9,11 @@ IPE:
 		echo "--> Entering ${MILEDIR}" ; \
 		make --no-print-directory DIRSFILE=${DIRSFILE} LIB; \
 	fi
+	if [ -d ${IODIR} ]; then \
+		cd $(IODIR); \
+		echo "--> Entering ${IODIR}" ; \
+		make --no-print-directory DIRSFILE=${DIRSFILE} LIB; \
+	fi
 	@cd ${SHAREDDIR}; \
 		echo "--> Entering ${SHAREDDIR}"; \
 		make --no-print-directory -f Makefile.UM DIRSFILE=${DIRSFILE} LIB
@@ -35,6 +40,11 @@ clean:
 	if [ -d ${MILEDIR} ]; then \
 		cd $(MILEDIR); \
 		echo "--> Entering ${MILEDIR}" ; \
+		make --no-print-directory DIRSFILE=${DIRSFILE} cleanall; \
+	fi
+	if [ -d ${IODIR} ]; then \
+		cd $(IODIR); \
+		echo "--> Entering ${IODIR}" ; \
 		make --no-print-directory DIRSFILE=${DIRSFILE} cleanall; \
 	fi
 	@cd ${SHAREDDIR}; \
