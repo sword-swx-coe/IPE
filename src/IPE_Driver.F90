@@ -17,12 +17,16 @@ IMPLICIT NONE
       line=__LINE__, file=__FILE__ ) ) CALL ipe % Trash()
 
     init_file = trim(ipe % parameters % file_prefix)//ipe % time_tracker % DateStamp( )//ipe % parameters % file_extension
-    INQUIRE( FILE = TRIM(init_file), EXIST = fileExists, iostat=stat )
-    IF ( ipe_iostatus_check( rc, msg="Error inquiring about IPE initial state file "//init_file, &
-      line=__LINE__, file=__FILE__ ) ) CALL ipe % Trash()
 
-    IF ( ipe_status_check( fileExists, msg="IPE initial state file not found: "//init_file, &
-      line=__LINE__, file=__FILE__ ) ) CALL ipe % Trash()
+    ! Only check for file existence if we need to read it:
+    IF (ipe % parameters % read_apex_neutrals) THEN
+      INQUIRE( FILE = TRIM(init_file), EXIST = fileExists, iostat=stat )
+      IF ( ipe_iostatus_check( rc, msg="Error inquiring about IPE initial state file "//init_file, &
+        line=__LINE__, file=__FILE__ ) ) CALL ipe % Trash()
+
+      IF ( ipe_status_check( fileExists, msg="IPE initial state file not found: "//init_file, &
+        line=__LINE__, file=__FILE__ ) ) CALL ipe % Trash()
+    endif
 
     CALL ipe % Initialize( init_file, rc=rc )
     IF ( ipe_iostatus_check( rc, msg="Error initializing IPE", &
