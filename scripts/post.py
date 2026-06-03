@@ -31,8 +31,15 @@ class Grid:
     for i in range(self.nlat_geo):
       self.latitude_geo[i]  = -90. + i * 180. / (self.nlat_geo-1)
 
-    for i in range(self.nheights_geo):
-      self.altitude_geo[i]  = i*5. + 90.
+    dAlt = 5.0
+    self.altitude_geo[0]  = 90.
+    for i in range(1, self.nheights_geo):
+      if (self.altitude_geo[i-1] >= 400.0):
+        dAlt = 10.0
+      if (self.altitude_geo[i-1] >= 1200.0):
+        dAlt = 20.0
+      self.altitude_geo[i]  = self.altitude_geo[i-1] + dAlt
+
 
     self.facfac_interface = np.zeros( (3, self.nlon_geo, self.nlat_geo, self.nheights_geo) )
     self.dd_interface     = np.zeros( (3, self.nlon_geo, self.nlat_geo, self.nheights_geo) )
@@ -296,7 +303,7 @@ class IPE:
       for iLat in range(nLats):
         for iAlt in range(nAlts):
           lons3d[:, iLat, iAlt] = self.grid.longitude_geo
-          
+
       z_var[:] = alts3d
       y_var[:] = lats3d
       x_var[:] = lons3d
@@ -353,7 +360,7 @@ class IPE:
     return
 
 def load_and_write(i):
-  print(files[i])
+  print('Reading file : ', files[i])
   timestamp = files[i][-15:-3]
   ipe.read_h5(files[i])
   ipe.write_netcdf(path.join(out_dir,"IPE_Params.geo.{}.nc".format(timestamp)), 
