@@ -380,8 +380,15 @@ CONTAINS
     IF ( PRESENT( rc ) ) rc = IPE_FAILURE
 
     ! Determine initialization type from parameters
-    is_cold_start = .false.
-        
+    IF (ipe % parameters % read_apex_neutrals) THEN
+      is_cold_start = .false.
+    else
+      is_cold_start = .true.
+    endif
+
+    IF ( ipe % mpi_layer % rank_id == 0 ) &
+      write(*,*) ' -> Checking for cold start : ', is_cold_start
+
     if (is_cold_start) then
        call Cold_Start_Initialize(ipe, localrc)
     else
@@ -422,8 +429,9 @@ CONTAINS
     call Initialize_Plasma_Temperatures(ipe)
 
     ! -- Ion densities
+    ! Cold start densities
     itemLoop1: DO item = 1, num_ion_densities
-      ipe % plasma % ion_densities(item,:,:,:) = 1.0E6
+      ipe % plasma % ion_densities(item,:,:,:) = 1.0e6
     END DO itemLoop1
 
     ! -- Ion velocities
