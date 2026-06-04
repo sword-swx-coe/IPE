@@ -98,7 +98,6 @@ contains
           end if               !abs(mlat)
        end do mlatLoop      !j=1,kmlat
 
-
        ctpoten=(maxval(phihm)-minval(phihm))/1.0E+3
        call init_heelis
        call colath(offset1_deg,offset2_deg)
@@ -129,6 +128,10 @@ contains
           write(*,*) ' --> CPCP (kV) : ', &
                (maxval(phihm) - minval(phihm))/1000.0
        endif
+       ! It seems that these are needed to figure out the dynamo cut-off latitude:
+       ctpoten=(maxval(phihm)-minval(phihm))/1.0E+3
+       call init_heelis
+       call colath(offset1_deg,offset2_deg)
          
 #endif
          
