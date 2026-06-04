@@ -6,7 +6,12 @@ module modmile
   ! Needed for MILE:
   USE ModIE
 
+  ! Needed for the indices:
+  use ModTimeConvert
+  use ModIndices
+
   type(ieModel), allocatable :: IEModel_
+  type(TimeType) :: currentIndexTime
   
 #endif
   
