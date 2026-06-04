@@ -111,7 +111,15 @@ MODULE IPE_Model_Parameters_Class
      character(len=iCharLen_), dimension(nAmieFilesMax) :: cAmieListSouth
      integer :: nAmieFilesNorth
      integer :: nAmieFilesSouth
-     
+
+     ! Index File settings:     
+     character(len=iCharLen_) :: f107IndexFile
+     character(len=iCharLen_) :: imfIndexFile
+     character(len=iCharLen_) :: aeIndexFile
+     logical :: useF107File
+     logical :: useImfFile
+     logical :: useAeFile
+
    CONTAINS
 
      PROCEDURE :: Build => Build_IPE_Model_Parameters
@@ -206,7 +214,12 @@ CONTAINS
     character(len=iCharLen_), dimension(nAmieFilesMax) :: cAmieListNorth
     character(len=iCharLen_), dimension(nAmieFilesMax) :: cAmieListSouth
     integer :: iFile
-    
+
+    ! Index File settings:     
+    character(len=iCharLen_) :: f107IndexFile
+    character(len=iCharLen_) :: imfIndexFile
+    character(len=iCharLen_) :: aeIndexFile
+
     ! Communication buffers
     CHARACTER(LEN=200), DIMENSION(25) :: sbuf
     INTEGER, DIMENSION(30) :: ibuf
@@ -244,6 +257,8 @@ CONTAINS
     NAMELIST / MILE / &
          mile_verbose, mile_efield, mile_aurora, mile_dir, &
          amiefilenorth, amiefilesouth
+    NAMELIST / INDICESFILES / &
+         f107IndexFile, imfIndexFile, aeIndexFile
     
     ! Begin
     IF (PRESENT(rc)) rc = IPE_SUCCESS
@@ -344,7 +359,11 @@ CONTAINS
     mile_dir = './extIE/'
     amiefilenorth = 'none'
     amiefilesouth = 'none'
-    
+
+    f107IndexFile = 'none'
+    imfIndexFile = 'none'
+    aeIndexFile = 'none'
+
     ! Read in namelist parameters
     IF ( mpi_layer % rank_id == 0 ) THEN
 
@@ -407,8 +426,6 @@ CONTAINS
         line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 #endif
 
-
-
       READ(cInputFileBuffer, NML = SpaceManagement, IOSTAT = iostatus )
       READ(cInputFileBuffer, NML = TimeStepping, IOSTAT = iostatus )
       READ(cInputFileBuffer, NML = Forcing, IOSTAT = iostatus )
@@ -417,7 +434,7 @@ CONTAINS
       READ(cInputFileBuffer, NML = ElDyn, IOSTAT = iostatus )
       READ(cInputFileBuffer, NML = Operational, IOSTAT = iostatus )
       READ(cInputFileBuffer, NML = MILE, IOSTAT = iostatus )
-
+      READ(cInputFileBuffer, NML = INDICESFILES, IOSTAT = iostatus )
 
       !READ( UNIT = fUnit, NML = SpaceManagement, IOSTAT = iostatus )
       !IF ( ipe_iostatus_check( iostatus, &
@@ -511,6 +528,28 @@ CONTAINS
       params % cAmieListSouth(iFile) = cAmieListSouth(iFile)
    enddo
 
+   ! Assign file names into the param class
+   params % f107IndexFile = f107IndexFile
+   params % imfIndexFile = imfIndexFile
+   params % aeIndexFile = aeIndexFile
+
+   ! Now check to see if they are actually real files:
+   if (trim(f107IndexFile) .ne. 'none') then
+     params % useF107File = .true.
+   else
+     params % useF107File = .false.
+   endif
+   if (trim(imfIndexFile) .ne. 'none') then
+     params % useImfFile = .true.
+   else
+     params % useImfFile = .false.
+   endif
+   if (trim(aeIndexFile) .ne. 'none') then
+     params % useAeFile = .true.
+   else
+     params % useAeFile = .false.
+   endif
+
 !#ifdef HAVE_MPI
 !   CALL MPI_BCAST( &
 !        ibuf, size(ibuf), MPI_INTEGER, 0, &
@@ -518,32 +557,6 @@ CONTAINS
 !   IF ( ipe_status_check( ierr == 0, &
 !        line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 !#endif
-
-      ! -- integers
-      ibuf(1:15) = &
-           (/ f107_kp_size, f107_kp_interval, f107_kp_skip_size, &
-           f107_kp_realtime_interval, f107_kp_data_size, &
-           f107_kp_read_in_start, mesh_fill, mesh_write, &
-           import_write, export_write, f107_flag, kp_flag, &
-           ap_flag, nhemi_power_index, shemi_power_index/)
-      ! -- logicals
-      IF ( read_apex_neutrals ) ibuf(16) = 1
-      IF ( read_geographic_neutrals ) ibuf(17) = 1
-      IF ( write_apex_neutrals ) ibuf(18) = 1
-      IF ( write_geographic_neutrals ) ibuf(19) = 1
-      IF ( write_geographic_eldyn ) ibuf(20) = 1
-      IF ( write_apex_eldyn ) ibuf(21) = 1
-      IF ( params % use_f107_kp_file ) ibuf(22) = 1
-      IF ( dynamo_efield ) ibuf(23) = 1
-      IF ( ipe_has_import ) ibuf(24) = 1
-      ! -- integers for operations
-      ibuf(25) = potential_model
-      ibuf(26) = transport_highlat_lp
-      ibuf(27) = perp_transport_max_lp
-      ibuf(28) = mile_verbose
-      ibuf(29) = nAmieFilesNorth
-      ibuf(30) = nAmieFilesSouth
-
 
    params % f107_kp_size             = f107_kp_size
    params % f107_kp_interval          = f107_kp_interval
