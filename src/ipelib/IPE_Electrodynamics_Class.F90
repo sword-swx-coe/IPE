@@ -226,6 +226,27 @@ CONTAINS
        ! Include north and south:
        call IEModel_%nLats(nlp * 2)
 
+       ! Now initialize the Index Library that is needed
+       ! for the IMF, AE, and F107:
+       if (parameters % useF107File) then
+         if (parameters % mile_verbose >= 0) &
+           write(*,*) ' -> Reading f107IndexFile : ', &
+             trim(parameters % f107IndexFile)
+         call init_f107(parameters % f107IndexFile)
+       endif
+       if (parameters % useImfFile) then
+         if (parameters % mile_verbose >= 0) &
+           write(*,*) ' -> Reading imfIndexFile : ', &
+             trim(parameters % imfIndexFile)
+         call init_imf(parameters % imfIndexFile)
+       endif
+       if (parameters % useAeFile) then
+         if (parameters % mile_verbose >= 0) &
+           write(*,*) ' -> Reading aeIndexFile : ', &
+             trim(parameters % aeIndexFile)
+         call init_ae(parameters % aeIndexFile)
+       endif
+
     endif
 
 #endif
@@ -278,17 +299,16 @@ CONTAINS
   ! ------------------------------------------------------------------------
   
   SUBROUTINE Update_IPE_Electrodynamics( &
-       eldyn, grid, forcing, time_tracker, plasma, &
-       offset1_deg,offset2_deg,potential_model, mpi_layer, rc )
+       eldyn, parameters, grid, forcing, time_tracker, plasma, &
+       mpi_layer, rc )
     IMPLICIT NONE
     CLASS( IPE_Electrodynamics ), INTENT(inout) :: eldyn
+    TYPE( IPE_Model_Parameters ), intent(in) :: parameters
     TYPE( IPE_Grid ),             INTENT(in)    :: grid
     TYPE( IPE_Forcing ),          INTENT(in)    :: forcing
     TYPE( IPE_Time ),             INTENT(in)    :: time_tracker
     TYPE( IPE_Plasma ),           INTENT(in)    :: plasma
     TYPE( IPE_MPI_Layer ),        INTENT(in)    :: mpi_layer
-    REAL(prec),                   INTENT(in)    :: offset1_deg,offset2_deg
-    INTEGER,                      INTENT(in)    :: potential_model
     INTEGER, OPTIONAL,            INTENT(out)   :: rc
     ! Local
     INTEGER :: lp, mp, localrc
@@ -296,6 +316,7 @@ CONTAINS
     REAL(prec) :: max_v_exb
 
     real :: sangle, bt, by, bz, swvel, swn
+    real :: au, al, ae, hpi, bx, den, temp
     
 #ifdef HAVE_MPI
     INTEGER :: mpiError
@@ -313,20 +334,55 @@ CONTAINS
     
 #ifdef HAVE_MILE
     if (useMile) then
+       ! Here we can use the srcIndices for grabbing the indices
+       currentIndexTime % iYear = time_tracker % year
+       currentIndexTime % iMonth = time_tracker % month
+       currentIndexTime % iDay = time_tracker % day
+       currentIndexTime % iHour = time_tracker % hour
+       currentIndexTime % iMinute = time_tracker % minute
+       currentIndexTime % iSecond = 0
+       call set_time(currentIndexTime)
+       if (parameters % useAeFile) then
+         call get_index('ae', ae)
+         call get_index('au', au)
+         call get_index('al', al)
+         ! call get_index('hpi', hpi)
+         call IEModel_ % useAeHp()
+         call IEModel_ % au(au)
+         call IEModel_ % al(al)
+         if (parameters % mile_verbose >= 1) &
+           write(*,*) ' -> Setting AU/AL : ', au, al
+       else
+         if (parameters % mile_verbose >= 0) &
+           write(*,*) 'Need AU/AL, but dont have it... Setting to 25'
+         call IEModel_ % au(25.0)
+         call IEModel_ % al(-25.0)
+       endif
+       if (parameters % useImfFile) then
+         call get_index('imfbx', bx)
+         call get_index('imfby', by)
+         call get_index('imfbz', bz)
+         call get_index('swvx', swvel)
+         swvel = abs(swvel)
+         call get_index('swn', swn)
+         call get_index('swt', temp)
+         if (parameters % mile_verbose >= 1) &
+           write(*,*) ' -> Setting IMF By, Bz, Vx, N : ', by, bz, swvel, swn 
+       endif
        call IEModel_ % imfBz(bz)
        call IEModel_ % imfBy(by)
        call IEModel_ % swV(swvel)
        call IEModel_ % swN(swn)
-       call IEModel_ % useAeHp()
-       call IEModel_ % au(25.0)
-       call IEModel_ % al(-25.0)
     endif
 #endif
     
     IF( dynamo_efield ) THEN
 
       CALL eldyn % Dynamo_Wrapper(grid, forcing, time_tracker, plasma, &
-                                  offset1_deg,offset2_deg, potential_model, mpi_layer, rc=localrc )
+                                  parameters % offset1_deg, &
+                                  parameters % offset2_deg, &
+                                  parameters % potential_model, &
+                                  mpi_layer, rc=localrc )
       IF ( ipe_error_check(localrc, msg="call to Dynamo_Wrapper failed", &
         line=__LINE__, file=__FILE__, rc=rc) ) RETURN
       IF( mpi_layer % rank_id == 0 )THEN
