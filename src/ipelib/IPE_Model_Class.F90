@@ -297,13 +297,11 @@ CONTAINS
             line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
        CALL ipe % eldyn % Update( &
+            ipe % parameters, &
             ipe % grid, &
             ipe % forcing, &
             ipe % time_tracker, &
             ipe % plasma, &
-            ipe % parameters % offset1_deg, &
-            ipe % parameters % offset2_deg, &
-            ipe % parameters % potential_model, &
             ipe % mpi_layer, &
             rc = localrc )
        IF ( ipe_error_check( localrc, msg="Failed to update electrodynamics", &
