@@ -223,7 +223,7 @@ CONTAINS
     IF ( msis_switch .and. (time % elapsed_sec > 0._prec .or. .NOT. params % read_apex_neutrals) ) THEN
       verbose = 0
       IF( mpi_layer % rank_id == 0 ) then
-          write(6,*) '-> Calling MSIS ', int(time % elapsed_sec / 60), ' Mins UT'
+          write(6,'(a,i02,a,i02,a)') '-> Calling MSIS at ', time % hour, ':', time % minute, ' UT'
           verbose = 0
       endif
       CALL neutrals % IPE_Neutrals_Empirical( grid, time, forcing, verbose, rc=localrc)
