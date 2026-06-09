@@ -18,11 +18,9 @@ IPE:
 
 ${EXE}:	${OBJECTS_EXE}
 	${LINK.f90}  ${Cflag2} \
-		-L${LIBDIR} ${LIBRARYDIR} \
+		${IPELIBDIRS} ${SYSTEMLIBDIRS} \
 		-o ${EXE} ${OBJECTS_EXE} \
-		-lIPE -lEfield -lDynamo -lFlip -lMsise -lShared \
-		-L${MILEDIR}/lib -lIE -lIO \
-		${Lflag1}  ${LIBRARIES}
+		${Lflag1} ${IPELIBS} ${SYSTEMLIBS}
 
 LIB:
 	@echo '--> Compiling IPE Main Functions in ${IPEDIR} <--'
