@@ -11,22 +11,28 @@ DOUBLEPREC = -frecord-marker=4 -fdefault-real-8 -fdefault-double-8
 PRECISION  =
 # ${DOUBLEPREC} ${MEM}
 
+# These are all the places to look for include and mod files:
 FORTRANMODULES = -I/usr/lib/x86_64-linux-gnu/fortran/gfortran-mod-15/
-INCLUDEDIR = -I/usr/local/include -I/usr/include -I${IODIR}/src
+INCLUDEDIR = -I/usr/local/include -I/usr/include -I${SHAREDDIR} -I${IODIR}/src -I${MILEDIR}/src
 HDF5INCLUDE = -I/usr/include/hdf5/openmpi
 ESMFMODULES = -I/home/ridley/Software/IPE/ESMF_src/Install/mod/modO/Linux.gfortran.64.mpiuni.default
 ESMFINCLUDE = -I/home/ridley/Software/IPE/ESMF_src/Install/include
+SEARCH = ${FORTRANMODULES} ${INCLUDEDIR} ${HDF5INCLUDE} ${ESMFMODULES} ${ESMFINCLUDE} ${EXTRASEARCH}
 
-LIBRARYDIR = -L/usr/local/lib -L/usr/lib/x86_64-linux-gnu -L/usr/lib/x86_64-linux-gnu/hdf5/openmpi/
-LIBRARIES = -lcomio -lhdf5hl_fortran -lhdf5_hl -lhdf5_fortran -lhdf5 -lcrypto -lcurl -lsz -lz -ldl -lm -lpnetcdf
+# These are places to look for libraries:
+IPELIBDIRS = -L${MILEDIR}/lib -L${LIBDIR}
+SYSTEMLIBDIRS = -L/usr/local/lib -L/usr/lib/x86_64-linux-gnu -L/usr/lib/x86_64-linux-gnu/hdf5/openmpi/
+
+# and these are the libraries:
+
+IPELIBS = -lIPE -lEfield -lDynamo -lFlip -lMsise -lShared -lIE -lIO
+SYSTEMLIBS = -lcomio -lhdf5hl_fortran -lhdf5_hl -lhdf5_fortran -lhdf5 -lcrypto -lcurl -lsz -lz -ldl -lm -lpnetcdf
 
 #PreProc = -DsysLinux -DcompGFORTRAN -DPACKAGE_NAME=\"ipe\" -DPACKAGE_TARNAME=\"ipe\" -DPACKAGE_VERSION=\"0.0.1\" -DPACKAGE_STRING=\"ipe\ 0.0.1\" -DPACKAGE_BUGREPORT=\"ipe_devteam@noaa.gov\" -DPACKAGE_URL=\"\" -DPACKAGE=\"ipe\" -DVERSION=\"0.0.1\" -DHAVE_MPI=1 -DHAVE_COMIO=1 -DHAVE_ESMF=1 
 
 PreProc = -DHAVE_MPI -DHAVE_MILE -DNEEDMODTIMECONVERT -DNEEDMODIOUNIT
 
 #-I/usr/lib/x86_64-linux-gnu/hdf5/openmpi
-
-SEARCH = -I${SHAREDDIR} -I${MILEDIR}/src ${FORTRANMODULES} ${INCLUDEDIR} ${HDF5INCLUDE} ${ESMFMODULES} ${ESMFINCLUDE} ${EXTRASEARCH}
 
 DEBUGFLAG = -C -g -fbacktrace -ffpe-trap=invalid,zero,overflow -fcheck=all
 DEBUG     = 
