@@ -106,7 +106,7 @@ def get_indices(ioDir = "ext/srcIndices"):
     if (not os.path.exists(ioDir)):
 
         command = \
-            "git clone git@github.com:GITMCode/srcIndices.git " + ieDir
+            "git clone git@github.com:GITMCode/srcIndices.git " + ioDir
         if (IsVerbose):
             print("-> Attempting to clone GITMCode/srcIndices with ssh.")
         run_command(command)
