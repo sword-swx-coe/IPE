@@ -1,15 +1,16 @@
 
 SHELL=/bin/sh
 
-COMPILE.f77     = ${CUSTOMPATH_F}mpifort
-COMPILE.f90     = ${CUSTOMPATH_F}mpifort
-LINK.f90	= ${CUSTOMPATH_MPI}mpifort
+# define compilers and linker:
+COMPILE.f77 = ${CUSTOMPATH_F}mpifort
+COMPILE.f90 = ${CUSTOMPATH_F}mpifort
+LINK.f90 = ${CUSTOMPATH_MPI}mpifort
 AR = ar -rs
 
+# define precision:
 SINGLEPREC = -frecord-marker=4
 DOUBLEPREC = -frecord-marker=4 -fdefault-real-8 -fdefault-double-8
 PRECISION  =
-# ${DOUBLEPREC} ${MEM}
 
 # These are all the places to look for include and mod files:
 FORTRANMODULES = -I/usr/lib/x86_64-linux-gnu/fortran/gfortran-mod-15/
@@ -23,20 +24,18 @@ SEARCH = ${FORTRANMODULES} ${INCLUDEDIR} ${HDF5INCLUDE} ${ESMFMODULES} ${ESMFINC
 IPELIBDIRS = -L${MILEDIR}/lib -L${LIBDIR}
 SYSTEMLIBDIRS = -L/usr/local/lib -L/usr/lib/x86_64-linux-gnu -L/usr/lib/x86_64-linux-gnu/hdf5/openmpi/
 
-# and these are the libraries:
-
+# These are the libraries:
 IPELIBS = -lIPE -lEfield -lDynamo -lFlip -lMsise -lShared -lIE -lIO
 SYSTEMLIBS = -lcomio -lhdf5hl_fortran -lhdf5_hl -lhdf5_fortran -lhdf5 -lcrypto -lcurl -lsz -lz -ldl -lm -lpnetcdf
 
-#PreProc = -DsysLinux -DcompGFORTRAN -DPACKAGE_NAME=\"ipe\" -DPACKAGE_TARNAME=\"ipe\" -DPACKAGE_VERSION=\"0.0.1\" -DPACKAGE_STRING=\"ipe\ 0.0.1\" -DPACKAGE_BUGREPORT=\"ipe_devteam@noaa.gov\" -DPACKAGE_URL=\"\" -DPACKAGE=\"ipe\" -DVERSION=\"0.0.1\" -DHAVE_MPI=1 -DHAVE_COMIO=1 -DHAVE_ESMF=1 
-
+# These are the preprocessor options:
 PreProc = -DHAVE_MPI -DHAVE_MILE -DNEEDMODTIMECONVERT -DNEEDMODIOUNIT
 
-#-I/usr/lib/x86_64-linux-gnu/hdf5/openmpi
-
+# If you need some debug flags, set DEBUG = ${DEBUGFLAG}:
 DEBUGFLAG = -C -g -fbacktrace -ffpe-trap=invalid,zero,overflow -fcheck=all
-DEBUG     = 
+DEBUG = 
 
+# Define some flags:
 F77FLAGS =  -fno-unsafe-math-optimizations -ffixed-line-length-132
 
 OPT0 = -O0
