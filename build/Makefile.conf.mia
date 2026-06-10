@@ -13,20 +13,20 @@ PRECISION  =
 
 FORTRANMODULES = -I/usr/lib64/gfortran/modules/
 COMIOINCLUDE = -I/mnt/data5/ipedir/COMIO/install/include
-INCLUDEDIR = -I/usr/include ${COMIOINCLUDE}
+INCLUDEDIR = -I/usr/include ${COMIOINCLUDE} -I${SHAREDDIR} -I${IODIR}/src -I${MILEDIR}/src
 ESMFMODULES = -I/home/aaronbuk/.local/spack/opt/spack/linux-zen2/esmf-8.8.1-2amtokp3ytoruld3row7qkxvzfoptkah/include
+SEARCH = ${FORTRANMODULES} ${INCLUDEDIR} ${HDF5INCLUDE} ${ESMFMODULES} ${ESMFINCLUDE} ${EXTRASEARCH}
 
+# These are places to look for libraries:
+IPELIBDIRS = -L${MILEDIR}/lib -L${LIBDIR}
 PNETCDFLIB = -L/home/aaronbuk/.local/spack/opt/spack/linux-zen2/parallel-netcdf-1.14.0-ow567cglgughojjuuorrkeqkd2rh4utb/lib
-LIBRARYDIR = -L/usr/lib64 -L/mnt/data5/ipedir/COMIO/install/lib ${PNETCDFLIB}
-LIBRARIES = -lcomio -lhdf5hl_fortran -lhdf5_hl -lhdf5_fortran -lhdf5 -lcrypto -lcurl -lsz -lz -ldl -lm -lpnetcdf
+SYSTEMLIBDIRS = -L/usr/lib64 -L/mnt/data5/ipedir/COMIO/install/lib ${PNETCDFLIB}
 
-#PreProc = -DsysLinux -DcompGFORTRAN -DPACKAGE_NAME=\"ipe\" -DPACKAGE_TARNAME=\"ipe\" -DPACKAGE_VERSION=\"0.0.1\" -DPACKAGE_STRING=\"ipe\ 0.0.1\" -DPACKAGE_BUGREPORT=\"ipe_devteam@noaa.gov\" -DPACKAGE_URL=\"\" -DPACKAGE=\"ipe\" -DVERSION=\"0.0.1\" -DHAVE_MPI=1 -DHAVE_COMIO=1 -DHAVE_ESMF=1 
+# and these are the libraries:
+IPELIBS = -lIPE -lEfield -lDynamo -lFlip -lMsise -lShared -lIE -lIO
+SYSTEMLIBS = -lcomio -lhdf5hl_fortran -lhdf5_hl -lhdf5_fortran -lhdf5 -lcrypto -lcurl -lsz -lz -ldl -lm -lpnetcdf
 
-PreProc = -DHAVE_MPI -DHAVE_MILE
-
-#-I/usr/lib/x86_64-linux-gnu/hdf5/openmpi
-
-SEARCH = -I${SHAREDDIR} -I${MILEDIR}/src ${FORTRANMODULES} ${INCLUDEDIR} ${ESMFMODULES} ${EXTRASEARCH}
+PreProc = -DHAVE_MPI -DHAVE_MILE -DNEEDMODTIMECONVERT -DNEEDMODIOUNIT
 
 DEBUGFLAG = -C -g -fbacktrace -ffpe-trap=invalid,zero,overflow -fcheck=all
 DEBUG     = 
