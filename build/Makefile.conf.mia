@@ -1,33 +1,40 @@
 
 SHELL=/bin/sh
 
-COMPILE.f77     = ${CUSTOMPATH_F}mpif90
-COMPILE.f90     = ${CUSTOMPATH_F}mpif90
-LINK.f90	= ${CUSTOMPATH_MPI}mpif90
+# define compilers and linker:
+COMPILE.f77 = ${CUSTOMPATH_F}mpif90
+COMPILE.f90 = ${CUSTOMPATH_F}mpif90
+LINK.f90 = ${CUSTOMPATH_MPI}mpif90
 AR = ar -rs
 
+# define precision:
 SINGLEPREC = -frecord-marker=4
 DOUBLEPREC = -frecord-marker=4 -fdefault-real-8 -fdefault-double-8
-PRECISION  =
-# ${DOUBLEPREC} ${MEM}
+PRECISION =
 
+# These are all the places to look for include and mod files:
 FORTRANMODULES = -I/usr/lib64/gfortran/modules/
 COMIOINCLUDE = -I/mnt/data5/ipedir/COMIO/install/include
 INCLUDEDIR = -I/usr/include ${COMIOINCLUDE} -I${SHAREDDIR} -I${IODIR}/src -I${MILEDIR}/src
 ESMFMODULES = -I/home/aaronbuk/.local/spack/opt/spack/linux-zen2/esmf-8.8.1-2amtokp3ytoruld3row7qkxvzfoptkah/include
-SEARCH = ${FORTRANMODULES} ${INCLUDEDIR} ${HDF5INCLUDE} ${ESMFMODULES} ${ESMFINCLUDE} ${EXTRASEARCH}
+# This MUST be defined:
+SEARCH = ${FORTRANMODULES} ${INCLUDEDIR} ${ESMFMODULES} ${EXTRASEARCH}
 
 # These are places to look for libraries:
-IPELIBDIRS = -L${MILEDIR}/lib -L${LIBDIR}
 PNETCDFLIB = -L/home/aaronbuk/.local/spack/opt/spack/linux-zen2/parallel-netcdf-1.14.0-ow567cglgughojjuuorrkeqkd2rh4utb/lib
+
+# There two MUST be defined:
+IPELIBDIRS = -L${MILEDIR}/lib -L${LIBDIR}
 SYSTEMLIBDIRS = -L/usr/lib64 -L/mnt/data5/ipedir/COMIO/install/lib ${PNETCDFLIB}
 
-# and these are the libraries:
+# These are the libraries (these two MUST be defined):
 IPELIBS = -lIPE -lEfield -lDynamo -lFlip -lMsise -lShared -lIE -lIO
 SYSTEMLIBS = -lcomio -lhdf5hl_fortran -lhdf5_hl -lhdf5_fortran -lhdf5 -lcrypto -lcurl -lsz -lz -ldl -lm -lpnetcdf
 
+# These are the preprocessor options (.F90 files...):
 PreProc = -DHAVE_MPI -DHAVE_MILE -DNEEDMODTIMECONVERT -DNEEDMODIOUNIT
 
+# If you need some debug flags, set DEBUG = ${DEBUGFLAG}:
 DEBUGFLAG = -C -g -fbacktrace -ffpe-trap=invalid,zero,overflow -fcheck=all
 DEBUG     = 
 
