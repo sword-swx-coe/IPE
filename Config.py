@@ -2,6 +2,7 @@
 
 import os
 import argparse
+import glob
 
 IsVerbose = False
 
@@ -9,13 +10,25 @@ IsVerbose = False
 # Function to parse input arguments
 # ----------------------------------------------------------------------
 
-def parse_args():
+def parse_args(buildDir, makefileConf):
 
     parser = argparse.ArgumentParser(description = 'Configure IPE Makefiles')
 
     parser.add_argument('-name', \
                         help = 'job name', \
                         default = 'boring_name')
+
+    front = buildDir + '/' + makefileConf + '.'
+    first = len(front)
+    list = glob.glob(front + '*')
+    confs = []
+    for l in list:
+        sub = l[first:]
+        confs.append(sub)
+    parser.add_argument('-conf', \
+                        help = 'which Makefile.conf to use ' + \
+                        '(e.g., -conf=Ubuntu -> build/Makefile.conf.Ubuntu)', \
+                        default = 'Ubuntu', choices = confs)
 
     parser.add_argument('-v',  \
                         action='store_true', default = False, \
@@ -159,10 +172,28 @@ def make_makefile_dirs(mainDir):
 # main code:
 # ----------------------------------------------------------------------
 
-args = parse_args()
+buildDir = 'build'
+mainMakefileConf = 'Makefile.conf'
+
+args = parse_args(buildDir, mainMakefileConf)
 if (args.v):
     IsVerbose = True
 
+confFile = mainMakefileConf + '.' + args.conf
+if (os.path.exists(buildDir + '/' + mainMakefileConf)):
+    command = 'rm -f ' + buildDir + '/' + mainMakefileConf
+    run_command(command)
+if (os.path.exists(buildDir + '/' + confFile)):
+    command = 'cd ' + buildDir + '; ln -s ' + confFile + ' ' + mainMakefileConf
+    run_command(command)
+else:
+    print('Could not find file : ' + buildDir + '/' + confFile)
+    print('Please use -conf=name, where name points to the file ' + \
+          buildDir + '/' + mainMakefileConf + '.name')
+    print('')
+    print('You hopefully can copy one of the existing ones and change')
+    print('some things in it to point to includes and libraries...')
+    
 mainDir = os.getcwd()
 
 makefileDirs = make_makefile_dirs(mainDir)
