@@ -357,8 +357,6 @@ CONTAINS
 
       day_diff = time_tracker % day_number - day_number
 
-
-
   END FUNCTION Calculate_Day_Difference
 
 END MODULE IPE_Time_Class
