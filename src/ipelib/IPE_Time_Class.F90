@@ -35,8 +35,6 @@ IMPLICIT NONE
 
   END TYPE IPE_Time
 
-
-
 CONTAINS
 
   SUBROUTINE Build_IPE_Time( time_tracker, time_stamp, rank_id )
