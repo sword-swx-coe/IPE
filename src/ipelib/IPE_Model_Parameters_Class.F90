@@ -558,12 +558,12 @@ CONTAINS
 !        line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 !#endif
 
-   params % f107_kp_size             = f107_kp_size
+   params % f107_kp_size              = 100000 ! IGNORE -> f107_kp_size
    params % f107_kp_interval          = f107_kp_interval
-   params % f107_kp_skip_size         = f107_kp_skip_size
+   params % f107_kp_skip_size         = 0 ! IGNORE -> f107_kp_skip_size
    params % f107_kp_realtime_interval = f107_kp_realtime_interval
-   params % f107_kp_data_size         = f107_kp_data_size
-   params % f107_kp_read_in_start     = f107_kp_read_in_start
+   params % f107_kp_data_size         = 100000 ! f107_kp_data_size
+   params % f107_kp_read_in_start     = 0 ! IGNORE -> f107_kp_read_in_start
    params % mesh_fill                 = mesh_fill
    params % mesh_write                = mesh_write
    params % import_write              = import_write
