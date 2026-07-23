@@ -4,18 +4,18 @@
 &TIMESTEPPING
  TIME_STEP   = 300D0,
  START_TIME  = 0.0D0,
- END_TIME    = 3600.0D0,
+ END_TIME    = 14400.0D0,
  MSIS_TIME_STEP   = 300.D0,
  INITIAL_TIMESTAMP = 201303160000,
 /
 &FORCING
  SOLAR_FORCING_TIME_STEP = 60.0D0,
- F107_KP_SIZE            = 2221,
- F107_KP_INTERVAL        = 60,
- F107_KP_SKIP_SIZE       = 2160,
- F107_KP_DATA_SIZE       = 2221,
+ F107_KP_SIZE            = 0,
+ F107_KP_INTERVAL        = 0,
+ F107_KP_SKIP_SIZE       = 0,
+ F107_KP_DATA_SIZE       = 0,
  F107_KP_READ_IN_START   = 0,
- F107_KP_FILE            = './wam_input_f107_kp.txt',
+ F107_KP_FILE            = './ipe_yyyymmdd.txt',
  F107_KP_REALTIME_INTERVAL = 0,
 /
 &FILEIO
@@ -34,7 +34,7 @@
   mesh_fill       = 1,
 /
 &ELDYN
-  DYNAMO_EFIELD = T,
+  DYNAMO_EFIELD = F,
 /
 &OPERATIONAL
   COLFAC                 = 1.3,
