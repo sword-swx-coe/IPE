@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import numpy as np
 from argparse import ArgumentParser, RawTextHelpFormatter
 from datetime import datetime, timedelta
