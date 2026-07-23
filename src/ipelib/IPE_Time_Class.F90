@@ -1,3 +1,26 @@
+
+subroutine get_unit(ipetime, unit)
+
+  USE IPE_Precision
+
+  implicit none
+  
+  real(prec) :: ipetime
+  character(6) :: unit
+
+  if (ipetime < 120) then
+     unit = ' (sec)'
+  else
+     if (ipetime < 7200) then
+        unit = ' (min)'
+        ipetime = ipetime / 60.0
+     else
+        unit = ' (hrs)'
+        ipetime = ipetime / 3600.0
+     endif
+  endif
+end subroutine get_unit
+
 MODULE IPE_Time_Class
 
 USE IPE_Precision
