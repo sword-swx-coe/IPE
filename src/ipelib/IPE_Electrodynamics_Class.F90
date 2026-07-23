@@ -324,15 +324,15 @@ CONTAINS
 
     IF (PRESENT(rc)) rc = IPE_SUCCESS
 
-    ! For MILE, update the drivers:
-    sangle= forcing % solarwind_angle ( forcing % current_index )
-    bt= forcing % solarwind_Bt (forcing % current_index )
+    sangle = forcing % solarwind_angle ( forcing % current_index )
+    bt = forcing % solarwind_Bt (forcing % current_index )
     swvel = forcing % solarwind_velocity (forcing % current_index )
     swn = forcing % solarwind_density (forcing % current_index )
     bz = bt * cos(sangle * 3.1415 / 180.0)
-    by = by * sin(sangle * 3.1415 / 180.0)
-    
+    by = bt * sin(sangle * 3.1415 / 180.0)
+
 #ifdef HAVE_MILE
+    ! For MILE, update the drivers:
     if (useMile) then
        ! Here we can use the srcIndices for grabbing the indices
        currentIndexTime % iYear = time_tracker % year
@@ -359,16 +359,21 @@ CONTAINS
          call IEModel_ % al(-25.0)
        endif
        if (parameters % useImfFile) then
-         call get_index('imfbx', bx)
-         call get_index('imfby', by)
-         call get_index('imfbz', bz)
-         call get_index('swvx', swvel)
-         swvel = abs(swvel)
-         call get_index('swn', swn)
-         call get_index('swt', temp)
-         if (parameters % mile_verbose >= 1) &
-           write(*,*) ' -> Setting IMF By, Bz, Vx, N : ', by, bz, swvel, swn 
+          call get_index('imfbx', bx)
+          call get_index('imfby', by)
+          call get_index('imfbz', bz)
+          call get_index('swvx', swvel)
+          swvel = abs(swvel)
+          call get_index('swn', swn)
+          call get_index('swt', temp)
+          if (parameters % mile_verbose >= 1) &
+               write(*,*) ' -> Setting IMF By, Bz, Vx, N : ', &
+               by, bz, swvel, swn
+       else
+          if (parameters % mile_verbose >= 0) &
+               write(*,*) 'No IMF file for MILE!!!'
        endif
+      
        call IEModel_ % imfBz(bz)
        call IEModel_ % imfBy(by)
        call IEModel_ % swV(swvel)
@@ -378,10 +383,12 @@ CONTAINS
     
     IF( dynamo_efield ) THEN
 
-
       IF( mpi_layer % rank_id == 0 )THEN
-       write(6,899) time_tracker % year, time_tracker % month, time_tracker % day, &
-                    time_tracker % hour, time_tracker % minute
+         write(6,899) time_tracker % year, &
+              time_tracker % month, &
+              time_tracker % day, &
+              time_tracker % hour, &
+              time_tracker % minute
  899   format(' -> Calling Dynamo E field ', i4,x,i2.2,x,i2.2,2x,i2.2,':',i2.2)
       ENDIF
 
@@ -483,9 +490,6 @@ CONTAINS
     REAL(prec) :: v_boost_factor
 
     v_boost_factor = 1.0
-
-!   write(1000 + mpi_layer % rank_id, *) 'TIME'
-
 
     DO mp = grid % mp_low, grid % mp_high
       DO lp = 1, grid % NLP
@@ -941,17 +945,26 @@ CONTAINS
     ! This subroutine sets constants and grid things:
     CALL init_cons
 
-    sangle= forcing % solarwind_angle ( forcing % current_index )
-    bt= forcing % solarwind_Bt (forcing % current_index )
-    swvel= forcing % solarwind_velocity (forcing % current_index )
-    swden= forcing % solarwind_density (forcing % current_index )
-    stilt= get_tilt(time_tracker%year,time_tracker%month,time_tracker%day,time_tracker%utime)
-    fkp= forcing % kp ( forcing % current_index )
-    ctpoten= 15.+15.*fkp+0.8*fkp**2
+    sangle = forcing % solarwind_angle ( forcing % current_index )
+    bt = forcing % solarwind_Bt (forcing % current_index )
+    swvel = forcing % solarwind_velocity (forcing % current_index )
+    swden = forcing % solarwind_density (forcing % current_index )
+    stilt = get_tilt( &
+         time_tracker%year, &
+         time_tracker%month, &
+         time_tracker%day, &
+         time_tracker%utime)
+    fkp = forcing % kp ( forcing % current_index )
+    ctpoten = 15.+15.*fkp+0.8*fkp**2
 
     year=2000
 
-    CALL sunloc( year, time_tracker % day_of_year, time_tracker % utime, sunlons, localrc )
+    CALL sunloc( &
+         year, &
+         time_tracker % day_of_year, &
+         time_tracker % utime, &
+         sunlons, &
+         localrc )
     IF ( ipe_error_check( localrc, msg="call to sunloc failed", &
          line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
