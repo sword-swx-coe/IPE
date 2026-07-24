@@ -1,15 +1,18 @@
+#!/usr/bin/env python3
+
 import numpy as np
 from netCDF4 import Dataset
 from multiprocessing import Pool
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 import glob
-from os import path, remove
+from os import path, remove, system
 from datetime import datetime
 
 class Grid:
   def __init__(self, path):
     # nlp, nmp, nfluxtube, nlon_geo, nlat_geo, nheights_geo
     # flux_tube_max(lp), facfac_interface, ii[1-4]_interface, dd_interface
+    print('-> Reading grid file : ', path)
     g = Dataset(path)
 
     self.nlp          = len(g.dimensions['phony_dim_0'])
@@ -359,14 +362,35 @@ class IPE:
 
     return
 
+# ----------------------------------------------------------------------
+# do system command
+# ----------------------------------------------------------------------
+
+def run_command(command):
+    if (IsVerbose):
+        print("   -> Running Command : ")
+        print("      ", command)
+    system(command)
+    return True
+
 def load_and_write(i):
-  print('Reading file : ', files[i])
+  print('-> Reading file : ', files[i])
   timestamp = files[i][-15:-3]
   ipe.read_h5(files[i])
-  ipe.write_netcdf(path.join(out_dir,"IPE_Params.geo.{}.nc".format(timestamp)), 
-                   timestamp)
-
-
+  fileout = path.join(out_dir,"IPE_Params.geo.{}.nc".format(timestamp))
+  print('--> Writing file : ', fileout)
+  ipe.write_netcdf(fileout, timestamp)
+  if (mv_dir): 
+    command = 'mv ' + files[i] + ' ' + mv_dir
+    run_command(command)
+    if (gzip_files):
+      command = 'cd ' + mv_dir + '; gzip -v ' + files[i] + '; cd -'
+      run_command(command)
+  else:
+    if (gzip_files):
+      command = 'gzip -v ' + files[i]
+      run_command(command)
+    
 ## input parsing options
 parser = ArgumentParser(description='Interpolate IPE Outputs to a geographic grid',
                         formatter_class=ArgumentDefaultsHelpFormatter)
@@ -376,15 +400,32 @@ parser.add_argument('-i', '--indir',  type=str, default="./",
                     help='path to input directory, if different from pwd')
 parser.add_argument('-o', '--outdir', default=None,
                     help='path to output directory, if you do not want to write to indir')
+parser.add_argument('-s', '--spheredir', default='UA/sphereOutput/',
+                    help='path to output sphere files')
+parser.add_argument('-m', '--movedir', default='UA/output/',
+                    help='path to move output files')
+parser.add_argument('-gzip', action='store_true',
+                    help='gzip original files')
 parser.add_argument('-keep', action='store_true',
-                    help="Include this flag to not delete the raw outputs")
+                    help='Include this flag to not delete the raw outputs')
+parser.add_argument('-v', action='store_true',
+                    help='turn verbose on')
+parser.add_argument('-um', action='store_true',
+                    help='use UM defaults (spheredir and movedir)')
 parser.add_argument('-n', '--nprocs', type=int, default=1,
                     help='Number of processors to use.')
 args = parser.parse_args()
 
+IsVerbose = args.v
 
 # Set defaults for outdir & gridfile
-out_dir = args.indir if args.outdir is None else args.outdir
+if (args.um):
+  out_dir = args.spheredir
+  mv_dir = args.movedir
+else:
+  out_dir = args.indir if args.outdir is None else args.outdir
+  mv_dir = None
+gzip_files = args.gzip
 grid_file = path.join(args.indir, 'IPE_Grid.nc') if args.gridfile is None else args.gridfile
 
 # Read in grid, find input files
@@ -398,6 +439,12 @@ else:
   for iFile in range(len(files)):
     load_and_write(iFile)
 
+if (mv_dir):
+  for eachFile in files:
+    command = 'mv ' + eachFile + ' ' + mv_dir
+    run_command(command)
+
+    
 # Remove files if we are not told to -keep them
 #if not args.keep:
 #  for eachFile in files:
