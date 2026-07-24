@@ -10,21 +10,22 @@
 /
 &FORCING
  SOLAR_FORCING_TIME_STEP = 60.0D0,
- F107_KP_SIZE            = 2221,
- F107_KP_INTERVAL        = 60,
- F107_KP_SKIP_SIZE       = 2160,
- F107_KP_DATA_SIZE       = 2221,
+ F107_KP_SIZE            = 0,
+ F107_KP_INTERVAL        = 0,
+ F107_KP_SKIP_SIZE       = 0,
+ F107_KP_DATA_SIZE       = 0,
  F107_KP_READ_IN_START   = 0,
- F107_KP_FILE            = './wam_input_f107_kp.txt',
+ F107_KP_FILE            = './ipe_20130316.dat',
  F107_KP_REALTIME_INTERVAL = 0,
 /
 &FILEIO
  READ_APEX_NEUTRALS        = T,
  WRITE_APEX_NEUTRALS       = T,
  WRITE_GEOGRAPHIC_NEUTRALS = T,
- FILE_OUTPUT_FREQUENCY     = 300.0D0,
+ FILE_OUTPUT_FREQUENCY     = 1800.0D0,
  FILE_PREFIX               = 'IPE_State.apex.',
  FILE_EXTENSION            = '.nc',
+ INPUT_FILE_DIR = "UA/dataIn/",
 /
 &ipecap
   mesh_height_min = 0.,
@@ -34,7 +35,7 @@
   mesh_fill       = 1,
 /
 &ELDYN
-  DYNAMO_EFIELD = T,
+  DYNAMO_EFIELD = F,
 /
 &OPERATIONAL
   COLFAC                 = 1.3,
@@ -48,8 +49,8 @@
 /
 &MILE
   MILE_VERBOSE = 2,
-  MILE_EFIELD = 'weimer',
-  MILE_AURORA = 'fta',
+  MILE_EFIELD = 'none',
+  MILE_AURORA = 'none',
   MILE_DIR = './extIE/',
   AMIEFILENORTH = 'none',
   AMIEFILESOUTH = 'none'
