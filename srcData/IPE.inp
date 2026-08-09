@@ -4,7 +4,7 @@
 &TIMESTEPPING
  TIME_STEP   = 300D0,
  START_TIME  = 0.0D0,
- END_TIME    = 3600.0D0,
+ END_TIME    = 14400.0D0,
  MSIS_TIME_STEP   = 300.D0,
  INITIAL_TIMESTAMP = 201303160000,
 /
@@ -15,7 +15,7 @@
  F107_KP_SKIP_SIZE       = 0,
  F107_KP_DATA_SIZE       = 0,
  F107_KP_READ_IN_START   = 0,
- F107_KP_FILE            = './ipe_20130316.dat',
+ F107_KP_FILE            = './ipe_yyyymmdd.txt',
  F107_KP_REALTIME_INTERVAL = 0,
 /
 &FILEIO
