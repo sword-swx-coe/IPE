@@ -734,7 +734,7 @@ CONTAINS
     ! Local
     CHARACTER(215)  :: filename
     INTEGER, PARAMETER :: num_groups = 1
-    CHARACTER(LEN=*), DIMENSION(num_groups),   PARAMETER :: groups = (/ "apex" /)
+    CHARACTER(LEN=*), DIMENSION(num_groups), PARAMETER :: groups = (/ "apex" /)
 
     INTEGER :: item
     CHARACTER(LEN=28) :: dset_name
@@ -757,11 +757,13 @@ CONTAINS
       file=__FILE__, line=__LINE__)) RETURN
 
     ! Setup common data decomposition for datasets
-    CALL ipe % io % domain( (/ ipe % grid % NLP, ipe % grid % NMP /), &
-      (/ 1, ipe % mpi_layer % mp_low /), &
-      (/ ipe % grid % NLP, ipe % mpi_layer % mp_high - ipe % mpi_layer % mp_low + 1 /) )
-    IF (ipe % io % err % check(msg="Failed to setup I/O data decomposition", &
-      file=__FILE__, line=__LINE__)) RETURN
+    CALL ipe % io % domain( &
+         (/ ipe % grid % NLP, ipe % grid % NMP /), &
+         (/ 1, ipe % mpi_layer % mp_low /), &
+         (/ ipe % grid % NLP, ipe % mpi_layer % mp_high - ipe % mpi_layer % mp_low + 1 /) )
+    IF (ipe % io % err % check(msg = &
+         "Failed to setup I/O data decomposition", &
+         file=__FILE__, line=__LINE__)) RETURN
 
     ! Write out electric field stuff:
     CALL ipe % io % write("ElectricPotential", &
@@ -785,8 +787,6 @@ CONTAINS
         ipe % plasma % aurora_avee2d(1:ipe % grid % NLP, ipe % mpi_layer % mp_low:ipe % mpi_layer % mp_high))
     IF (ipe % io % err % check(msg="Unable to write dataset AveE", &
         file=__FILE__, line=__LINE__)) RETURN
-
-
 
     ! Close HDF5 file
     CALL ipe % io % close()
