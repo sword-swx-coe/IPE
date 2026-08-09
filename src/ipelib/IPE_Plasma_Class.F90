@@ -15,9 +15,11 @@ MODULE IPE_Plasma_Class
   IMPLICIT NONE
 
   TYPE IPE_Plasma
-    INTEGER :: nFluxTube, NLP, NMP
-    INTEGER :: mp_low, mp_high, mp_halo
+     INTEGER :: nFluxTube, NLP, NMP
+     INTEGER :: mp_low, mp_high, mp_halo
 
+     REAL(prec) :: HPn, HPs, CPCP
+   
     REAL(prec), POINTER     :: ion_densities(:,:,:,:)
     REAL(prec), ALLOCATABLE :: ion_velocities(:,:,:,:)
     REAL(prec), POINTER     :: ion_temperature(:,:,:)
@@ -186,14 +188,18 @@ CONTAINS
     nMlts = iEnd - iStart + 1
     nLats = NLP * 2
 
+    allocate(area2d(nMlts, nLats), stat = stat)
+    IF ( ipe_alloc_check( stat, &
+         msg="Failed to allocate plasma area2d array", &
+         line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+    
 #ifdef HAVE_MILE
 
     allocate( &
          mlts2d(nMlts, nLats), &
          lats2d(nMlts, nLats), &
          eflux2d(nMlts, nLats), &
-         avee2d(nMlts, nLats), &
-         area2d(nMlts, nLats), stat = stat)
+         avee2d(nMlts, nLats), stat = stat)
     IF ( ipe_alloc_check( stat, &
          msg="Failed to allocate plasma MILE arrays", &
          line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
@@ -297,7 +303,6 @@ CONTAINS
     INTEGER :: mpiError
 #endif
     integer :: iS, iE
-    real :: HPn, HPs
 
     IF ( PRESENT( rc ) ) rc = IPE_SUCCESS
 
@@ -382,15 +387,15 @@ CONTAINS
            enddo
          enddo
 
-         HPn = sum( &
+         plasma % HPn = sum( &
               area2d(:, 1:grid % nlp) * &
               eflux2d(:, 1:grid % nlp)/1000.0) / 1e9
-         HPs = sum( &
+         plasma % HPs = sum( &
               area2d(:, grid % nlp + 1 : nLats) * &
               eflux2d(:, grid % nlp + 1 : nLats)/1000.0) / 1e9
          if (iMileVerbose > 1) &
               write(*,*) " --> MILE: Hemispheric power on IPE grid (N/S) : ", &
-              HPn, HPs
+              plasma % HPn, plasma % HPs
       endif
 
 #endif
@@ -398,7 +403,8 @@ CONTAINS
       CALL plasma % Auroral_Precipitation( grid, &
                                            neutrals, &
                                            forcing, &
-                                           time_tracker )
+                                           time_tracker, &
+                                           mpi_layer )
 
       if (mpi_layer % rank_id.eq.0) then
          write(6,899) time_tracker % year, time_tracker % month, time_tracker % day, &       
@@ -1293,7 +1299,8 @@ CONTAINS
 
 
   SUBROUTINE Auroral_Precipitation( &
-       plasma, grid, neutrals, forcing, time_tracker )
+       plasma, grid, neutrals, forcing, time_tracker, &
+       mpi_layer)
   ! Previously : tiros_ionize_ipe
 
     CLASS( IPE_Plasma ), INTENT(inout) :: plasma
@@ -1301,6 +1308,7 @@ CONTAINS
     TYPE( IPE_Neutrals ), INTENT(in)   :: neutrals
     TYPE( IPE_Forcing ), INTENT(in)    :: forcing
     TYPE( IPE_Time ), INTENT(in)       :: time_tracker
+    TYPE( IPE_MPI_Layer ), INTENT(in)   :: mpi_layer
     ! Local
     INTEGER, PARAMETER :: jmaxwell = 6
     INTEGER    :: i, lp, mp, m, j, iband, l
@@ -1322,8 +1330,9 @@ CONTAINS
 
     REAL(prec), PARAMETER :: fc = 1.6e-06_prec
 
-    integer :: iMlt, iLatS, kkS, kS
+    integer :: iMlt, iLatS, kkS, kS, iLatN, iError
     real(prec) :: chS, ratio_chS, efluxS, chiS, diffS
+    real(prec) :: dMLT, dLat, localVar
 
     en(1:15) = (/ &
          0.37_prec, 0.6_prec, 0.92_prec, 1.37_prec, 2.01_prec, &
@@ -1387,11 +1396,35 @@ CONTAINS
 
     nMlts = plasma % mp_high - plasma % mp_low + 1
     nLats = (grid % NLP) * 2
-      
+
+    ! Here we assume a uniform longitude:
+    dMlt = rtd * (grid % magnetic_longitude(plasma % mp_low + 1) - &
+         grid % magnetic_longitude(plasma % mp_low))
+
+    area2d = 0.0
+    DO lp = 1, grid % NLP - 1
+       iLatN = lp
+       iLatS = nLats - iLatN + 1
+       DO mp = plasma % mp_low, plasma % mp_high
+          ! We include the halo, so make sure to offset by that!
+          iMlt = mp - plasma % mp_low + 1 + grid % mp_halo
+          dLat = rtd * (grid % magnetic_colatitude(1, lp+1) - &
+               grid % magnetic_colatitude(1, lp))
+          area2d(iMlt, iLatN) = &
+               120000.0 * 120000.0 * &
+               dMlt * dLat * sin(grid % magnetic_colatitude(1, lp))
+          area2d(iMlt, iLatS) = area2d(iMlt, iLatN)
+       enddo
+    enddo
+
+    plasma % HPn = 0.0
+    plasma % HPs = 0.0
+    
     DO mp = plasma % mp_low, plasma % mp_high
        ! We include the halo, so make sure to offset by that!
        iMlt = mp - plasma % mp_low + 1 + grid % mp_halo
        DO lp = 1, grid % NLP
+          iLatN = lp
           iLatS = nLats - lp + 1
 
           DO i=1,grid % flux_tube_max(lp)
@@ -1487,6 +1520,9 @@ CONTAINS
                
             endif
             eflux = 10.0_prec**(eflux)/1000.0_prec
+
+            plasma % HPn = plasma % HPn + eflux * area2d(iMlt, iLatN)
+            plasma % HPs = plasma % HPs + eflux * area2d(iMlt, iLatS)
 
             if ((forcing % cmaps(j2,i2,l) > 0.0) .and. &
                  (forcing % cmaps(j2,i1,l) > 0.0) .and. &
@@ -1688,12 +1724,38 @@ CONTAINS
 
               ENDIF
 
-            ENDDO
+           ENDDO
           ENDIF
 
-        ENDDO
-      ENDDO
+       ENDDO
+    ENDDO
 
+#ifdef HAVE_MPI
+    localVar = plasma % HPn/1e9/1e3
+    CALL MPI_ALLREDUCE( &
+         localVar, &
+         plasma % HPn, &
+         1, &
+         mpi_layer % mpi_prec, &
+         MPI_SUM, &
+         mpi_layer % mpi_communicator, &
+         iError )
+    localVar = plasma % HPs/1e9/1e3
+    CALL MPI_ALLREDUCE( &
+         localVar, &
+         plasma % HPs, &
+         1, &
+         mpi_layer % mpi_prec, &
+         MPI_SUM, &
+         mpi_layer % mpi_communicator, &
+         iError )
+#endif
+#ifdef HAVE_MPI
+    if (mpi_layer % rank_id.eq.0) then
+       write(*,*) '  --> HP N/S : ', plasma % HPn, plasma % HPs
+    endif
+#endif
+    
   END SUBROUTINE Auroral_Precipitation
 
 
