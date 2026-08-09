@@ -380,7 +380,11 @@ CONTAINS
        call IEModel_ % swN(swn)
     endif
 #endif
-    
+
+    IF (mpi_layer % rank_id == 0) THEN
+       write(*,*) "  --> IMF By, Bz, SWN ", by, bz, swn
+    endif
+        
     IF( dynamo_efield ) THEN
 
       IF( mpi_layer % rank_id == 0 )THEN
@@ -957,6 +961,11 @@ CONTAINS
     fkp = forcing % kp ( forcing % current_index )
     ctpoten = 15.+15.*fkp+0.8*fkp**2
 
+    IF (mpi_layer % rank_id == 0) THEN
+       write(*,*) "  --> Dynamo, Sangle, Bt ", sangle, bt, swvel, stilt
+    endif
+
+    
     year=2000
 
     CALL sunloc( &
@@ -1152,9 +1161,12 @@ CONTAINS
     pot_map(1,:)=phim(40,:)
     pot_map(82,:)=phim(41,:)
 
+       write(*,*) ' --> CPCP ipe_ele..._class (kV) : ', &
+            (maxval(pot_map) - minval(pot_map))/1000.0
 
-    ! This subroutine is really just an interpolation routine to move a variable from one grid to the
-    ! IPE grid.  It just fills in the electric_potential variable.
+    ! This subroutine is really just an interpolation routine to move
+    ! a variable from one grid to the IPE grid.  It just fills in the
+    ! electric_potential variable.
     CALL eldyn % Regrid_Potential( &
          grid, mpi_layer, &
          time_tracker, &
@@ -1162,9 +1174,11 @@ CONTAINS
          xlonm_deg_map, &
          ylatm_deg_map, &
          1, 82,kmlat, rc=localrc )
-    IF ( ipe_error_check( localrc, msg="call to Regrid_Potential (ed1dy_map) failed", &
+    IF ( ipe_error_check( localrc, &
+         msg="call to Regrid_Potential (ed1dy_map) failed", &
          line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
-    eldyn % electric_field(1,:,:) = eldyn % electric_potential(:,grid % mp_low:grid % mp_high)
+    eldyn % electric_field(1,:,:) = &
+         eldyn % electric_potential(:,grid % mp_low:grid % mp_high)
 
     CALL eldyn % Regrid_Potential( &
          grid, &
@@ -1174,10 +1188,11 @@ CONTAINS
          xlonm_deg_map, &
          ylatm_deg_map, &
          1, 82,kmlat, rc=localrc )
-    IF ( ipe_error_check( localrc, msg="call to Regrid_Potential (ed2dy_map) failed", &
+    IF ( ipe_error_check( localrc, &
+         msg="call to Regrid_Potential (ed2dy_map) failed", &
          line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
-    eldyn % electric_field(2,:,:) = eldyn % electric_potential(:,grid % mp_low:grid % mp_high)
-
+    eldyn % electric_field(2,:,:) = &
+         eldyn % electric_potential(:,grid % mp_low:grid % mp_high)
 
     CALL eldyn % Regrid_Potential( &
          grid, &
@@ -1187,9 +1202,9 @@ CONTAINS
          xlonm_deg_map, &
          ylatm_deg_map, &
          1, 82,kmlat, rc=localrc )
-    IF ( ipe_error_check( localrc, msg="call to Regrid_Potential (ed2dy_map) failed", &
+    IF ( ipe_error_check( localrc, &
+         msg="call to Regrid_Potential (ed2dy_map) failed", &
          line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
-
 
   END SUBROUTINE Dynamo_Wrapper
 
