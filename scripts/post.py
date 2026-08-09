@@ -7,6 +7,7 @@ from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 import glob
 from os import path, remove, system
 from datetime import datetime
+import time
 
 class Grid:
   def __init__(self, path):
@@ -414,6 +415,13 @@ parser.add_argument('-um', action='store_true',
                     help='use UM defaults (spheredir and movedir)')
 parser.add_argument('-n', '--nprocs', type=int, default=1,
                     help='Number of processors to use.')
+parser.add_argument('-totaltime',
+                    help = 'specify how long to run in total in hours, (default 0 - only run once)',
+                    default = 0, type = int)
+parser.add_argument('-sleep',
+                    help = 'how long to sleep between loops in seconds, (default 900)',
+                    default = 900, type = int)
+
 args = parser.parse_args()
 
 IsVerbose = args.v
@@ -430,19 +438,41 @@ grid_file = path.join(args.indir, 'IPE_Grid.nc') if args.gridfile is None else a
 
 # Read in grid, find input files
 ipe = IPE(grid_file)
-files = sorted(glob.glob(path.join(args.indir,"IPE_State.apex.*")))
 
-if args.nprocs > 1:
-  p = Pool(min([len(files),args.nprocs]))
-  p.map(load_and_write,range(len(files)))
-else:
-  for iFile in range(len(files)):
-    load_and_write(iFile)
+DidWork = True
+startTime = datetime.now()
 
-if (mv_dir):
-  for eachFile in files:
-    command = 'mv ' + eachFile + ' ' + mv_dir
-    run_command(command)
+while DidWork:
+  
+  files = sorted(glob.glob(path.join(args.indir,"IPE_State.apex.*")))
+
+  if args.nprocs > 1:
+    p = Pool(min([len(files),args.nprocs]))
+    p.map(load_and_write,range(len(files)))
+  else:
+    for iFile in range(len(files)):
+      load_and_write(iFile)
+
+  currentTime = datetime.now()
+  dt = ((currentTime - startTime).total_seconds())/3600.0
+  if (dt > args.totaltime):
+    if args.totaltime == 0:
+      # Different exit message for non-continuous runs 
+      print(" -> All done!")
+    else:
+      print(" -> Stopping due to totaltime exceeded!")
+    # want to break out of loop, so set loop breaking condition:
+    DidWork = False
+    
+  if (DidWork):
+    # everything ok, go to sleep for a bit
+    print('Sleeping ... ', args.sleep, ' sec.')
+    time.sleep(args.sleep)
+    
+#if (mv_dir):
+#  for eachFile in files:
+#    command = 'mv ' + eachFile + ' ' + mv_dir
+#    run_command(command)
 
     
 # Remove files if we are not told to -keep them
