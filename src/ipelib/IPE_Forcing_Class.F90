@@ -355,6 +355,7 @@ CONTAINS
 
     integer :: nPointsActual = 0
     integer :: year, month, day, hour, minute, second
+    real*4 :: dummy
     
     rc = IPE_SUCCESS
 
@@ -415,6 +416,16 @@ CONTAINS
                                      forcing % solarwind_velocity(i), &
                                      forcing % solarwind_Bz(i), &
                                      forcing % solarwind_density(i)
+      if (forcing % nhemi_power_index(i) < 0) then
+         dummy = forcing % nhemi_power(i)
+         forcing % nhemi_power_index(i) = &
+              2.09*ALOG(dummy)*1.0475
+      endif
+      if (forcing % shemi_power_index(i) < 0) then
+         dummy = forcing % shemi_power(i)
+         forcing % shemi_power_index(i) = &
+              2.09*ALOG(dummy)*1.0475
+      endif
       if (iostat == 0) then
          
          if (i == read_in_start) then
