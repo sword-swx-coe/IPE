@@ -961,11 +961,6 @@ CONTAINS
     fkp = forcing % kp ( forcing % current_index )
     ctpoten = 15.+15.*fkp+0.8*fkp**2
 
-    IF (mpi_layer % rank_id == 0) THEN
-       write(*,*) "  --> Dynamo, Sangle, Bt ", sangle, bt, swvel, stilt
-    endif
-
-    
     year=2000
 
     CALL sunloc( &
@@ -1160,9 +1155,11 @@ CONTAINS
     pot_map(42:81,:)=phim(1:40,:)
     pot_map(1,:)=phim(40,:)
     pot_map(82,:)=phim(41,:)
-
+    
+    if (mpi_layer % rank_id == 0) then
        write(*,*) ' --> CPCP ipe_ele..._class (kV) : ', &
             (maxval(pot_map) - minval(pot_map))/1000.0
+    endif
 
     ! This subroutine is really just an interpolation routine to move
     ! a variable from one grid to the IPE grid.  It just fills in the
