@@ -1752,7 +1752,7 @@ CONTAINS
 #endif
 #ifdef HAVE_MPI
     if (mpi_layer % rank_id.eq.0) then
-       write(*,*) '  --> HP N/S : ', plasma % HPn, plasma % HPs
+       write(*,*) ' --> HP N/S : ', plasma % HPn, plasma % HPs
     endif
 #endif
     
