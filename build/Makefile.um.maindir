@@ -74,9 +74,8 @@ rundir:
 	@echo "--> Making ${RUNDIR}"
 	@mkdir -p ${RUNDIR}
 	@mkdir -p ${RUNDIR}/UA
-	cd ${RUNDIR}/UA; \
-		mkdir -p output dataIn; \
-		ln -s ${DATADIR}/* dataIn
-	cd ${RUNDIR}; \
-		ln -s ${BINDIR}/ipe.exe .; \
-		cp ${DATADIR}/IPE.inp .
+	cd ${RUNDIR}; ln -s ${BINDIR}/ipe.exe .
+	cd ${RUNDIR}; cp ${DATADIR}/IPE.inp .
+	cd ${RUNDIR}; ln -s ${GRIDFILE} .
+	cd ${RUNDIR}/UA; mkdir -p output dataIn sphereOutput
+	cd ${RUNDIR}/UA/dataIn; ln -s ${DATADIR}/* .
