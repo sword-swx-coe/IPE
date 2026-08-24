@@ -381,12 +381,15 @@ def load_and_write(i):
   fileout = path.join(out_dir,"IPE_Params.geo.{}.nc".format(timestamp))
   print('--> Writing file : ', fileout)
   ipe.write_netcdf(fileout, timestamp)
-  if (mv_dir): 
+  if (mv_dir):
     command = 'mv ' + files[i] + ' ' + mv_dir
     run_command(command)
     if (gzip_files):
       command = 'cd ' + mv_dir + '; gzip -v ' + files[i] + '; cd -'
       run_command(command)
+    file2d = "ipe_2d.{}.nc".format(timestamp)
+    command = 'mv ' + file2d + ' ' + out_dir
+    run_command(command)
   else:
     if (gzip_files):
       command = 'gzip -v ' + files[i]
