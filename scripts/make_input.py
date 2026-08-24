@@ -93,9 +93,11 @@ def main(args):
     write_ipe_data(t_start, allData)
 
     if args.mile:
-        filespec = f"_{t_start.strftime("%Y%m%d")}.txt"
-        write_swmf_imf_file(imf, 'imf'+filespec)
-        write_sme_file(imf, 'ae'+filespec)
+        ymd = t_start.strftime("%Y%m%d")
+        imffile = 'imf' + ymd + '.dat'
+        aefile = 'ae' + ymd + '.dat'
+        write_swmf_imf_file(imf, imffile)
+        write_sme_file(imf, aefile)
 
     return
 
@@ -214,7 +216,7 @@ def get_imf(start, end, doGiveAE=True, verbose=False):
         imf_ae[v] = imf_ae[v][t_ma]
 
     imf_ae['btot'] = np.sqrt(imf_ae['bx']**2 + imf_ae['by']**2 + imf_ae['bz']**2)
-    imfang = np.degrees(np.atan2(imf_ae['by'], imf_ae['bz']))
+    imfang = np.degrees(np.arctan2(imf_ae['by'], imf_ae['bz']))
     imfang = np.where(imfang<0, imfang+360, imfang) # -180-180 -> 0-360
     imf_ae['bangle'] = imfang
 
