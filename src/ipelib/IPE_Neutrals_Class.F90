@@ -220,14 +220,23 @@ CONTAINS
 
     msis_switch = mod(time % elapsed_sec,params % msis_time_step) == 0.0
 
-    IF ( msis_switch .and. (time % elapsed_sec > 0._prec .or. .NOT. params % read_apex_neutrals) ) THEN
+    IF ( msis_switch .and. &
+         (time % elapsed_sec > 0._prec .or. &
+         .NOT. params % read_apex_neutrals) ) THEN
       verbose = 0
       IF( mpi_layer % rank_id == 0 ) then
-          write(6,'(a,i02,a,i02,a)') '-> Calling MSIS at ', time % hour, ':', time % minute, ' UT'
+         write(6,'(a,i02,a,i02,a)') '  --> Calling MSIS at ', &
+              time % hour, ':', time % minute, ' UT'
           verbose = 0
       endif
-      CALL neutrals % IPE_Neutrals_Empirical( grid, time, forcing, verbose, rc=localrc)
-      IF ( ipe_error_check( localrc, msg="call to IPE_Neutrals_Empirical failed", rc=rc ) ) RETURN
+      CALL neutrals % IPE_Neutrals_Empirical( &
+           grid, &
+           time, &
+           forcing, &
+           verbose, &
+           rc=localrc)
+      IF ( ipe_error_check( localrc, &
+           msg = "call to IPE_Neutrals_Empirical failed", rc=rc ) ) RETURN
     ENDIF
 
     CALL neutrals % IPE_Neutrals_Extrapolate( grid, forcing )
