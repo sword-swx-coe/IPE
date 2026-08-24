@@ -382,18 +382,19 @@ CONTAINS
 #endif
 
     IF (mpi_layer % rank_id == 0) THEN
-       write(*,*) "  --> IMF By, Bz, SWN ", by, bz, swn
+       write(*,*) " --> IMF By, Bz, SWN ", by, bz, swn
     endif
         
     IF( dynamo_efield ) THEN
 
       IF( mpi_layer % rank_id == 0 )THEN
-         write(6,899) time_tracker % year, &
+         write(6,899) &
+              time_tracker % year, &
               time_tracker % month, &
               time_tracker % day, &
               time_tracker % hour, &
               time_tracker % minute
- 899   format(' -> Calling Dynamo E field ', i4,x,i2.2,x,i2.2,2x,i2.2,':',i2.2)
+ 899   format('  --> Calling Dynamo E field ', i4,x,i2.2,x,i2.2,2x,i2.2,':',i2.2)
       ENDIF
 
       CALL eldyn % Dynamo_Wrapper(grid, forcing, time_tracker, plasma, &
