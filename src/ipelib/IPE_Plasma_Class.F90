@@ -407,9 +407,13 @@ CONTAINS
                                            mpi_layer )
 
       if (mpi_layer % rank_id.eq.0) then
-         write(6,899) time_tracker % year, time_tracker % month, time_tracker % day, &       
-              time_tracker % hour, time_tracker % minute
-899      format(' -> Calling Plasma         ', &
+         write(6,899) &
+              time_tracker % year, &
+              time_tracker % month, &
+              time_tracker % day, &       
+              time_tracker % hour, &
+              time_tracker % minute
+899      format('  --> Calling Plasma         ', &
               i4,x,i2.2,x,i2.2,2x,i2.2,':',i2.2)
       endif
 
@@ -420,7 +424,11 @@ CONTAINS
                                   time_step, colfac, hpeq, nflag_t,nflag_d )
 
       !TWFANG, calculate field line integrals for dynamo solver
-      CALL plasma % Calculate_Field_Line_Integrals(grid, neutrals, colfac, mpi_layer)
+      CALL plasma % Calculate_Field_Line_Integrals( &
+           grid, &
+           neutrals, &
+           colfac, &
+           mpi_layer)
 
   END SUBROUTINE Update_IPE_Plasma
 
