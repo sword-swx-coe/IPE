@@ -212,6 +212,7 @@ CONTAINS
                                ipe % parameters % offset1_deg, &
                                ipe % parameters % offset2_deg, &
                                ipe % parameters % potential_model, &
+                               ipe % parameters % high_lat_potential_source, &
                                ipe % mpi_layer, &
                                rc=localrc )
     IF( localrc /= IPE_SUCCESS ) THEN

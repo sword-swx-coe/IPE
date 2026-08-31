@@ -922,6 +922,17 @@ module ipeCap
         return  ! bail out
     end if
 
+    ! -- hand the imported RIM high-latitude electric potential [V] to the
+    !    electrodynamics solver. this % rim_epot and ipe % eldyn % high_lat_potential
+    !    are both on the (kmlonp1,kmlat) geomagnetic dynamo grid, so this is a
+    !    direct index-for-index copy. rim_epot is a pointer that is only allocated
+    !    when the RIM coupling is active; before the first import it holds zeros,
+    !    and the dynamo wrapper falls back to the empirical high-lat potential
+    !    (see the high_lat_potential_source parameter).
+    if (associated(this % rim_epot)) then
+      ipe % eldyn % high_lat_potential = this % rim_epot
+    end if
+
     ! -- advance IPE model
     call Update_IPE(ipe, clock, rc=rc)
     if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &

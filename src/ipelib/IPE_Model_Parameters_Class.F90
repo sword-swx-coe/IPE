@@ -83,6 +83,7 @@ MODULE IPE_Model_Parameters_Class
     REAL(prec) :: offset1_deg
     REAL(prec) :: offset2_deg
     INTEGER    :: potential_model
+    INTEGER    :: high_lat_potential_source  ! 1 = empirical high-lat model (default), 2 = SWMF/RIM
     REAL(prec) :: hpeq
     INTEGER    :: transport_highlat_lp
     INTEGER    :: perp_transport_max_lp
@@ -161,6 +162,7 @@ CONTAINS
     REAL(prec) :: offset1_deg
     REAL(prec) :: offset2_deg
     INTEGER    :: potential_model
+    INTEGER    :: high_lat_potential_source
     REAL(prec) :: hpeq
     INTEGER    :: transport_highlat_lp
     INTEGER    :: perp_transport_max_lp
@@ -168,7 +170,7 @@ CONTAINS
 
     ! Communication buffers
     CHARACTER(LEN=200), DIMENSION( 6) :: sbuf
-    INTEGER,            DIMENSION(27) :: ibuf
+    INTEGER,            DIMENSION(28) :: ibuf
     REAL(prec),         DIMENSION(26) :: rbuf
 
 
@@ -185,7 +187,8 @@ CONTAINS
                                  import_write, export_write, ipe_has_import
     NAMELIST / ElDyn           / dynamo_efield
     NAMELIST / OPERATIONAL     / colfac, offset1_deg, offset2_deg, potential_model, hpeq, &
-                                 transport_highlat_lp, perp_transport_max_lp, vertical_wind_limit
+                                 transport_highlat_lp, perp_transport_max_lp, vertical_wind_limit, &
+                                 high_lat_potential_source
 
     ! Begin
     IF (PRESENT(rc)) rc = IPE_SUCCESS
@@ -261,6 +264,7 @@ CONTAINS
     offset1_deg           = 5.0_prec
     offset2_deg           = 20.0_prec
     potential_model       = 2
+    high_lat_potential_source = 1   ! 1 = empirical (Heelis/Weimer); 2 = SWMF/RIM potential
     hpeq                  = 0.0_prec
     transport_highlat_lp  = 30
     perp_transport_max_lp = 151
@@ -343,6 +347,7 @@ CONTAINS
       ibuf(25) = potential_model
       ibuf(26) = transport_highlat_lp
       ibuf(27) = perp_transport_max_lp
+      ibuf(28) = high_lat_potential_source
 
       ! -- reals
       rbuf = (/ time_step, start_time, end_time, msis_time_step, solar_forcing_time_step, &
@@ -397,6 +402,14 @@ CONTAINS
     params % potential_model           = ibuf(25)
     params % transport_highlat_lp      = ibuf(26)
     params % perp_transport_max_lp     = ibuf(27)
+    params % high_lat_potential_source = ibuf(28)
+
+    ! Validate the high-latitude potential source: 1 = empirical high-latitude
+    ! model (Heelis/Weimer, default), 2 = electric potential imported from SWMF/RIM.
+    IF ( ipe_status_check( params % high_lat_potential_source == 1 .OR. &
+                           params % high_lat_potential_source == 2, &
+      msg="high_lat_potential_source must be 1 (empirical) or 2 (RIM)", &
+      line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
 #ifdef HAVE_MPI
     CALL MPI_BCAST( rbuf, size(rbuf), mpi_layer % mpi_prec, 0, mpi_layer % mpi_communicator, ierr )

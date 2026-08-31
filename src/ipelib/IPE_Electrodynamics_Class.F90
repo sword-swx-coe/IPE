@@ -46,6 +46,9 @@ IMPLICIT NONE
     ! Attributes on geomagnetic grid
     REAL(prec), POINTER :: geomag_hall_conductivity(:,:)
     REAL(prec), POINTER :: geomag_pedersen_conductivity(:,:)
+    ! High-latitude electric potential [V] imported from SWMF/RIM, on the
+    ! (kmlonp1,kmlat) geomagnetic dynamo grid (same layout as geomag_*_conductivity).
+    REAL(prec), ALLOCATABLE :: high_lat_potential(:,:)
 
     CONTAINS
 
@@ -150,12 +153,14 @@ CONTAINS
 
       ALLOCATE( eldyn % geomag_hall_conductivity(kmlonp1,kmlat), &
                 eldyn % geomag_pedersen_conductivity(kmlonp1,kmlat), &
+                eldyn % high_lat_potential(kmlonp1,kmlat), &
                 stat=stat )
       IF ( ipe_alloc_check( stat, msg="Unable to allocate internal arrays", &
         line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
       eldyn % geomag_hall_conductivity       = 0.0_prec
       eldyn % geomag_pedersen_conductivity   = 0.0_prec
+      eldyn % high_lat_potential             = 0.0_prec
 
   END SUBROUTINE Build_IPE_Electrodynamics
 
@@ -181,6 +186,7 @@ CONTAINS
                   eldyn % lon_interp_weights, &
                   eldyn % lat_interp_index, &
                   eldyn % lon_interp_index, &
+                  eldyn % high_lat_potential, &
                   stat=stat )
       IF ( ipe_dealloc_check( stat, msg="Unable to deallocate internal arrays", &
         line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
@@ -199,7 +205,8 @@ CONTAINS
 
 
   SUBROUTINE Update_IPE_Electrodynamics( eldyn, grid, forcing, time_tracker, plasma, &
-                                         offset1_deg,offset2_deg,potential_model, mpi_layer, rc )
+                                         offset1_deg,offset2_deg,potential_model, &
+                                         high_lat_potential_source, mpi_layer, rc )
     IMPLICIT NONE
     CLASS( IPE_Electrodynamics ), INTENT(inout) :: eldyn
     TYPE( IPE_Grid ),             INTENT(in)    :: grid
@@ -209,6 +216,7 @@ CONTAINS
     TYPE( IPE_MPI_Layer ),        INTENT(in)    :: mpi_layer
     REAL(prec),                   INTENT(in)    :: offset1_deg,offset2_deg
     INTEGER,                      INTENT(in)    :: potential_model
+    INTEGER,                      INTENT(in)    :: high_lat_potential_source
     INTEGER, OPTIONAL,            INTENT(out)   :: rc
     ! Local
     INTEGER :: lp, mp, localrc
@@ -223,7 +231,8 @@ CONTAINS
     IF( dynamo_efield ) THEN
 
       CALL eldyn % Dynamo_Wrapper(grid, forcing, time_tracker, plasma, &
-                                  offset1_deg,offset2_deg, potential_model, mpi_layer, rc=localrc )
+                                  offset1_deg,offset2_deg, potential_model, &
+                                  high_lat_potential_source, mpi_layer, rc=localrc )
       IF ( ipe_error_check(localrc, msg="call to Dynamo_Wrapper failed", &
         line=__LINE__, file=__FILE__, rc=rc) ) RETURN
       IF( mpi_layer % rank_id == 0 )THEN
@@ -725,7 +734,8 @@ CONTAINS
 
 
   SUBROUTINE Dynamo_Wrapper(eldyn,grid,forcing,time_tracker, plasma, &
-                            offset1_deg,offset2_deg,potential_model, mpi_layer, rc)
+                            offset1_deg,offset2_deg,potential_model, &
+                            high_lat_potential_source, mpi_layer, rc)
 
     use module_init_cons!,only:init_cons
     use module_init_heelis!,only:init_heelis
@@ -746,9 +756,10 @@ CONTAINS
     TYPE( IPE_MPI_Layer ),        INTENT(in)    :: mpi_layer
     REAL(prec),                   INTENT(in)    :: offset1_deg,offset2_deg
     INTEGER,                      INTENT(in)    :: potential_model
+    INTEGER,                      INTENT(in)    :: high_lat_potential_source
     INTEGER, OPTIONAL,            INTENT(out)   :: rc
 
-    INTEGER, PARAMETER :: dyn_midpoint=48 
+    INTEGER, PARAMETER :: dyn_midpoint=48
     REAL(prec) :: ed_IPE(2,grid % NLP,grid % NMP,2) !1:N/SH....4:ed1/2
     REAL(prec) :: eldyn_conductivities(6,2,dyn_midpoint,grid % NMP) !1:N/SH....4:ed1/2
     REAL(prec) :: ed_conductivities(6,kmlon+1,kmlat)
@@ -926,6 +937,42 @@ CONTAINS
     call highlat( offset1_deg,offset2_deg, potential_model, rc=localrc )
     if (ipe_error_check(localrc,msg="call to highlat failed", &
       line=__LINE__, file=__FILE__, rc=rc)) return
+
+    ! --- RIM -> IPE high-latitude potential override --------------------------
+    ! high_lat_potential_source: 1 = empirical high-lat model (Heelis/Weimer via
+    ! highlat, the default), 2 = electric potential imported from SWMF/RIM.
+    !
+    ! When 2, replace the empirical high-latitude boundary potential phihm with
+    ! the RIM potential held in eldyn % high_lat_potential [V] (copied by the
+    ! NUOPC cap from this % rim_epot). Mapping details:
+    !   * grid: both phihm and high_lat_potential are on the SAME (kmlonp1,kmlat)
+    !     geomagnetic dynamo grid; the assignment is index-for-index (i,j) with NO
+    !     regrid. This is the exact reverse of the Hall/Pedersen conductance
+    !     export, which copies geomag_*_conductivity(i,j) -> grid2d(i,j).
+    !   * hemispheres: j runs South(j=1) -> North(j=kmlat) in both arrays, so
+    !     there is NO hemisphere flip.
+    !   * units: both in Volts (highlat's Weimer branch does epot[kV]*1e3 -> V;
+    !     RIM IONO_*_Phi is already in V), so NO unit conversion.
+    ! pfrac (set by colath() inside highlat) is intentionally left untouched, so
+    ! the dynamo solver blends the imposed high-lat potential into the interior
+    ! exactly as for the empirical path. The same equatorward cutoff as highlat's
+    ! Weimer branch (|mlat| <= 30 deg -> 0) is applied so the blend boundary is
+    ! unchanged.
+    !
+    ! First-coupling fallback: before the first RIM import arrives,
+    ! eldyn % high_lat_potential is all zeros; the any(...)/=0 guard then keeps
+    ! the empirical phihm so the first coupling step matches the empirical run.
+    if ( high_lat_potential_source == 2 .and. &
+         any( eldyn % high_lat_potential /= 0.0_prec ) ) then
+      do j = 1, kmlat
+        if ( abs( xlatm_deg(j) ) <= 30.0_prec ) then
+          phihm(1:kmlonp1,j) = 0.0_prec
+        else
+          phihm(1:kmlonp1,j) = eldyn % high_lat_potential(1:kmlonp1,j)
+        end if
+      end do
+    end if
+    ! --------------------------------------------------------------------------
 
     call dynamo( rc = localrc )
     if (ipe_error_check(localrc,msg="call to dynamo failed", &
