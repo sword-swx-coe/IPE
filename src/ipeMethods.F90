@@ -18,6 +18,10 @@ module ipeMethods
     real(prec),       pointer :: rim_epot(:,:)
     real(prec),       pointer :: rim_aver(:,:)
     real(prec),       pointer :: rim_diff(:,:)
+    ! Receipt flags describe only the current ModelAdvance import.
+    logical :: rim_epot_received = .false.
+    logical :: rim_aver_received = .false.
+    logical :: rim_diff_received = .false.
   end type
 
   type IPE_InternalState_Type

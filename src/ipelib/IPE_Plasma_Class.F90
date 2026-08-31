@@ -9,6 +9,8 @@ MODULE IPE_Plasma_Class
   USE IPE_MPI_Layer_Class
   USE IPE_Common_Routines
   USE ipe_error_module
+  USE params_module, ONLY: kmlat, kmlon, kmlonp1
+  USE cons_module, ONLY: xlatm_deg
 
   IMPLICIT NONE
 
@@ -36,6 +38,10 @@ MODULE IPE_Plasma_Class
     REAL(prec), ALLOCATABLE :: ionization_rates(:,:,:,:)
     REAL(prec), ALLOCATABLE :: conductivities(:,:,:,:)
 
+    LOGICAL :: use_rim_aurora = .FALSE.
+    REAL(prec) :: rim_aver(kmlonp1,kmlat)
+    REAL(prec) :: rim_diff(kmlonp1,kmlat)
+
 
     CONTAINS
 
@@ -44,6 +50,8 @@ MODULE IPE_Plasma_Class
 
       PROCEDURE :: Update => Update_IPE_Plasma
       PROCEDURE :: Update_Halos => Update_Halos_IPE_Plasma
+      PROCEDURE :: Set_RIM_Aurora => Set_RIM_Aurora_IPE_Plasma
+      PROCEDURE :: Disable_RIM_Aurora => Disable_RIM_Aurora_IPE_Plasma
 
       ! PRIVATE Routines
       PROCEDURE, PRIVATE :: Clean_Data
@@ -123,6 +131,27 @@ MODULE IPE_Plasma_Class
 
 CONTAINS
 
+  SUBROUTINE Set_RIM_Aurora_IPE_Plasma( plasma, aver, diff, rc )
+    CLASS(IPE_Plasma), INTENT(inout) :: plasma
+    REAL(prec), INTENT(in) :: aver(:,:), diff(:,:)
+    INTEGER, OPTIONAL, INTENT(out) :: rc
+    IF (PRESENT(rc)) rc = IPE_SUCCESS
+    IF (ANY(SHAPE(aver) /= [kmlonp1,kmlat]) .OR. &
+        ANY(SHAPE(diff) /= [kmlonp1,kmlat])) THEN
+      IF (PRESENT(rc)) rc = IPE_FAILURE
+      RETURN
+    END IF
+
+    plasma % rim_aver = aver
+    plasma % rim_diff = diff
+    plasma % use_rim_aurora = .TRUE.
+  END SUBROUTINE Set_RIM_Aurora_IPE_Plasma
+
+  SUBROUTINE Disable_RIM_Aurora_IPE_Plasma( plasma )
+    CLASS(IPE_Plasma), INTENT(inout) :: plasma
+    plasma % use_rim_aurora = .FALSE.
+  END SUBROUTINE Disable_RIM_Aurora_IPE_Plasma
+
   SUBROUTINE Build_IPE_Plasma( plasma, nFluxTube, NLP, NMP, mp_low, mp_high, halo, rc )
 
     CLASS( IPE_Plasma ), INTENT(out) :: plasma
@@ -170,6 +199,7 @@ CONTAINS
       plasma % electron_temperature    = safe_temperature_minimum
       plasma % ionization_rates        = 0.0_prec
       plasma % conductivities          = 0.0_prec
+      plasma % use_rim_aurora          = .FALSE.
 
 #ifdef HAVE_MPI
       ALLOCATE( ion_requestHandle(1:16))
@@ -206,6 +236,8 @@ CONTAINS
                 stat = stat )
     IF ( ipe_dealloc_check( stat, msg="Unable to free up memory", &
       line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+
+    plasma % use_rim_aurora = .FALSE.
 
 #ifdef HAVE_MPI
     DEALLOCATE( ion_requestHandle, stat=stat )
@@ -1124,19 +1156,23 @@ CONTAINS
     ! Local
     INTEGER, PARAMETER :: jmaxwell = 6
     INTEGER    :: i, lp, mp, m, j, iband, l
-    INTEGER    :: i1, i2, j1, j2, k, kk
+    INTEGER    :: i1, i2, j1, j2, k, kk, kNorth, kkNorth, kSouth, kkSouth
+    INTEGER    :: iLonRim
     INTEGER    :: tiros_activity_level
     REAL(prec) :: ratio(1:21)
-    REAL(prec) :: mlt, dfac
+    REAL(prec) :: mlt, dfac, dfacNorth, dfacSouth
     REAL(prec) :: ch, chi, diff, alpha
     REAL(prec) :: eflux, essa, dl_lower,dl_upper,qiont_lower,qiont_upper
     REAL(prec) :: ri, rj, th, THMagd, GW
+    REAL(prec) :: latNorth, latSouth, efluxNorth, efluxSouth
+    REAL(prec) :: chNorth, chSouth
+    REAL(prec) :: rimLat(kmlat)
     REAL(prec) :: pres(plasma % nFluxTube)
     REAL(prec) :: den(plasma % nFluxTube), grav(plasma % nFluxTube)
     REAL(prec) :: ntot(plasma % nFluxTube), meanmass(plasma % nFluxTube)
     REAL(prec) :: rno, rang, pr, ratioz, rlamz, q
     REAL(prec) :: TE11(21),TE15(21)
-    REAL(prec) :: ratio_ch,en_maxwell(jmaxwell),dl(jmaxwell)
+    REAL(prec) :: ratio_ch, ratioNorth, ratioSouth, en_maxwell(jmaxwell),dl(jmaxwell)
     REAL(prec) :: qion_maxwell(plasma % nFluxTube)
     REAL(prec) :: en(1:15), width(1:15), RLAM(1:21), ionchr(1:21)
 
@@ -1155,11 +1191,12 @@ CONTAINS
                                   0.895_prec, 0.785_prec, 0.650_prec, 0.540_prec, 0.415_prec, &
                                   0.320_prec, 0.225_prec, 0.14_prec, 0.08_prec, 0.04_prec, 0.0_prec /)
 
-       ionchr(1:21) = (/ 0.378_prec, 0.458_prec, 0.616_prec, 0.773_prec, 0.913_prec, &
+      ionchr(1:21) = (/ 0.378_prec, 0.458_prec, 0.616_prec, 0.773_prec, 0.913_prec, &
                                      1.088_prec, 1.403_prec, 1.718_prec, 2.033_prec, 2.349_prec, &
                                      2.979_prec, 3.610_prec, 4.250_prec, 4.780_prec, 6.130_prec, &
                                      7.392_prec, 8.653_prec, 9.914_prec, 12.436_prec, 14.957_prec, 17.479_prec /)
 
+      rimLat = REAL(xlatm_deg, prec)
       tiros_activity_level = forcing % nhemi_power_index( forcing % current_index )
       GW                   = forcing % nhemi_power( forcing % current_index )
 
@@ -1254,26 +1291,113 @@ CONTAINS
                  rj*(1.0_prec-ri)*forcing % cmaps(j2,i1,l) + &
                  (1.0_prec-rj)*(1.0_prec-ri)*forcing % cmaps(j1,i1,l)
 
+            IF (plasma % use_rim_aurora) THEN
+              ! Flux-tube index mp starts at 0 degrees, while the imported RIM
+              ! array uses IPE's legacy dynamo grid starting at -180 degrees.
+              ! Shift by 180 degrees (half the grid) and wrap periodically.
+              iLonRim = MODULO(mp + kmlon/2 - 1, kmlon) + 1
+              latNorth = 90.0_prec - rtd*grid % magnetic_colatitude(1,lp)
+              latSouth = 90.0_prec - rtd*grid % magnetic_colatitude(grid % flux_tube_max(lp),lp)
+              CALL Map_RIM_Aurora_To_Flux_Tube(plasma % rim_aver, plasma % rim_diff, rimLat, &
+                   iLonRim, latNorth, latSouth, efluxNorth, efluxSouth, chNorth, chSouth)
+              dfacNorth = 1.0_prec
+              dfacSouth = 1.0_prec
 
-            IF ( ch < 0.378_prec ) THEN
-              ch = 0.379_prec
-            ENDIF
-
-            DO kk = 2 , 21
-              IF ( ch <= ionchr(kk) ) THEN
-                k = kk - 1
-                EXIT
+              ! Use the original TIROS spectrum lookup for each RIM footpoint.
+              ! ionchr contains the 21 characteristic energies for which IPE
+              ! has tabulated spectra.  Start with the northern RIM energy.
+              ch = chNorth
+              ! Keep the energy inside the first interpolation interval.  The
+              ! 0.379 value is the lower table limit (0.378 keV) plus 0.001.
+              IF ( ch < 0.378_prec ) THEN
+                ch = 0.379_prec
               ENDIF
-            ENDDO
 
-            kk = k+1
-            chi = ch - ionchr(k)
-            diff = ionchr(kk) - ionchr(k)
-            ratio_ch = chi/diff
+              ! Find the two tabulated energies that bracket ch: k is the
+              ! lower-energy spectrum and kk is the upper-energy spectrum.
+              DO kk = 2 , 21
+                IF ( ch <= ionchr(kk) ) THEN
+                  k = kk - 1
+                  EXIT
+                ENDIF
+              ENDDO
+
+              kk = k+1
+              chi = ch - ionchr(k)
+              diff = ionchr(kk) - ionchr(k)
+              ! Save the northern bounds and fractional distance between them;
+              ! these select and interpolate the two northern spectra later.
+              chNorth = ch
+              kNorth = k
+              kkNorth = kk
+              ratioNorth = chi/diff
+
+              ! Repeat the same lookup independently for the southern RIM
+              ! energy because conjugate footpoints need not have equal input.
+              ch = chSouth
+              IF ( ch < 0.378_prec ) THEN
+                ch = 0.379_prec
+              ENDIF
+
+              DO kk = 2 , 21
+                IF ( ch <= ionchr(kk) ) THEN
+                  k = kk - 1
+                  EXIT
+                ENDIF
+              ENDDO
+
+              kk = k+1
+              chi = ch - ionchr(k)
+              diff = ionchr(kk) - ionchr(k)
+              ! Retain the southern lookup while the scalar work variables are
+              ! reused by the original precipitation calculation below.
+              chSouth = ch
+              kSouth = k
+              kkSouth = kk
+              ratioSouth = chi/diff
+            ELSE
+              ! Preserve the original TIROS spectrum selection when RIM is not
+              ! providing auroral precipitation.
+              IF ( ch < 0.378_prec ) THEN
+                ch = 0.379_prec
+              ENDIF
+
+              DO kk = 2 , 21
+                IF ( ch <= ionchr(kk) ) THEN
+                  k = kk - 1
+                  EXIT
+                ENDIF
+              ENDDO
+
+              kk = k+1
+              chi = ch - ionchr(k)
+              diff = ionchr(kk) - ionchr(k)
+              ratio_ch = chi/diff
+            END IF
 
             DO i = 1 , grid % flux_tube_max(lp)
 
               IF ( grid % altitude(i,lp) <= 1.0e+06_prec )THEN
+
+                IF (plasma % use_rim_aurora) THEN
+                  ! Apply precipitation from the corresponding magnetic
+                  ! footpoint on each half of the flux tube.
+                  IF (i <= grid % flux_tube_midpoint(lp)) THEN
+                    eflux = efluxNorth
+                    ch = chNorth
+                    k = kNorth
+                    kk = kkNorth
+                    ratio_ch = ratioNorth
+                    dfac = dfacNorth
+                  ELSE
+                    eflux = efluxSouth
+                    ch = chSouth
+                    k = kSouth
+                    kk = kkSouth
+                    ratio_ch = ratioSouth
+                    dfac = dfacSouth
+                  END IF
+                END IF
 
                 grav(i) = -grid % grx(i,lp,mp)
 

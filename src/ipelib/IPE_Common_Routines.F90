@@ -148,4 +148,65 @@ CONTAINS
 
   END SUBROUTINE Hat_Weights
 
+  SUBROUTINE Map_RIM_Aurora_To_Flux_Tube( aver, diff, lat, iLon, &
+       latNorth, latSouth, efluxNorth, efluxSouth, chNorth, chSouth )
+    REAL(prec), INTENT(in)  :: aver(:,:), diff(:,:), lat(:)
+    INTEGER, INTENT(in)     :: iLon
+    REAL(prec), INTENT(in)  :: latNorth, latSouth
+    REAL(prec), INTENT(out) :: efluxNorth, efluxSouth
+    REAL(prec), INTENT(out) :: chNorth, chSouth
+    INTEGER :: j
+
+    ! A flux tube has distinct northern and southern magnetic footpoints;
+    ! interpolate the same RIM longitude independently at each latitude.
+    CALL Interpolate_RIM_Aurora(aver, diff, lat, iLon, latNorth, &
+         efluxNorth, chNorth)
+    CALL Interpolate_RIM_Aurora(aver, diff, lat, iLon, latSouth, &
+         efluxSouth, chSouth)
+
+  CONTAINS
+
+    SUBROUTINE Interpolate_RIM_Aurora(averIn, diffIn, latIn, iLonIn, &
+         targetLat, efluxOut, chOut)
+      REAL(prec), INTENT(in)  :: averIn(:,:), diffIn(:,:), latIn(:)
+      INTEGER, INTENT(in)     :: iLonIn
+      REAL(prec), INTENT(in)  :: targetLat
+      REAL(prec), INTENT(out) :: efluxOut, chOut
+      INTEGER :: j1, j2, nLat
+      REAL(prec) :: latValue, weight
+
+      nLat = SIZE(latIn)
+      j1 = 1
+      j2 = 1
+      IF (targetLat <= latIn(1)) THEN
+         j1 = 1
+         j2 = 1
+         weight = 0.0_prec
+      ELSEIF (targetLat >= latIn(nLat)) THEN
+         j1 = nLat
+         j2 = nLat
+         weight = 0.0_prec
+      ELSE
+         DO j = 1, nLat - 1
+            IF (targetLat <= latIn(j+1)) THEN
+               j1 = j
+               j2 = j + 1
+               EXIT
+            END IF
+         END DO
+         weight = (targetLat - latIn(j1))/(latIn(j2) - latIn(j1))
+      END IF
+
+      latValue = (1.0_prec - weight)*averIn(iLonIn,j1) + &
+           weight*averIn(iLonIn,j2)
+      ! RIM energy flux is W/m2; IPE uses mW/m2.  IPE's characteristic
+      ! energy is one half of RIM's average energy (both energies are keV).
+      efluxOut = 1000.0_prec*MAX( &
+           (1.0_prec - weight)*diffIn(iLonIn,j1) + &
+           weight*diffIn(iLonIn,j2), 0.0_prec)
+      chOut = 0.5_prec*latValue
+    END SUBROUTINE Interpolate_RIM_Aurora
+
+  END SUBROUTINE Map_RIM_Aurora_To_Flux_Tube
+
 END MODULE IPE_Common_Routines

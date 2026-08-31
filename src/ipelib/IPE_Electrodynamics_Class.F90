@@ -13,6 +13,7 @@ USE IPE_Plasma_Class
 USE efield_ipe
 USE dynamo_module
 USE ipe_error_module
+USE params_module, ONLY: kmlat, kmlonp1
 
 IMPLICIT NONE
 
@@ -35,6 +36,8 @@ IMPLICIT NONE
     REAL(prec), ALLOCATABLE :: pedersen_conductivity(:,:)
     REAL(prec), ALLOCATABLE :: b_parallel_conductivity(:,:)
     REAL(prec), ALLOCATABLE :: neutral_apex_velocity(:,:,:) ! Components are apex directions
+    LOGICAL, PRIVATE :: use_rim_potential = .FALSE.
+    REAL(prec), PRIVATE :: rim_potential(kmlonp1,kmlat)
 
     ! Geographic interpolated attributes
     REAL(prec), ALLOCATABLE :: geo_electric_potential(:,:)
@@ -52,6 +55,8 @@ IMPLICIT NONE
       PROCEDURE :: Build => Build_IPE_Electrodynamics
       PROCEDURE :: Trash => Trash_IPE_Electrodynamics
       PROCEDURE :: Update => Update_IPE_Electrodynamics
+      PROCEDURE, PUBLIC :: Set_RIM_Potential => Set_RIM_Potential_IPE_Electrodynamics
+      PROCEDURE, PUBLIC :: Disable_RIM_Potential => Disable_RIM_Potential_IPE_Electrodynamics
       PROCEDURE, PRIVATE :: Empirical_E_Field_Wrapper
       PROCEDURE, PRIVATE :: Dynamo_Wrapper
       PROCEDURE, PRIVATE :: Regrid_Potential
@@ -65,6 +70,31 @@ IMPLICIT NONE
   REAL(prec), PRIVATE :: theta90_rad(0:nmlat)
 
 CONTAINS
+
+
+  SUBROUTINE Set_RIM_Potential_IPE_Electrodynamics( eldyn, epot, rc )
+    IMPLICIT NONE
+    CLASS(IPE_Electrodynamics), INTENT(inout) :: eldyn
+    REAL(prec),                 INTENT(in)    :: epot(:,:)
+    INTEGER, OPTIONAL,          INTENT(out)   :: rc
+    IF (PRESENT(rc)) rc = IPE_SUCCESS
+
+    IF (SIZE(epot,1) /= kmlonp1 .OR. SIZE(epot,2) /= kmlat) THEN
+      IF (PRESENT(rc)) rc = IPE_FAILURE
+      RETURN
+    END IF
+
+    eldyn % rim_potential = epot
+    eldyn % use_rim_potential = .TRUE.
+  END SUBROUTINE Set_RIM_Potential_IPE_Electrodynamics
+
+
+  SUBROUTINE Disable_RIM_Potential_IPE_Electrodynamics( eldyn )
+    IMPLICIT NONE
+    CLASS(IPE_Electrodynamics), INTENT(inout) :: eldyn
+
+    eldyn % use_rim_potential = .FALSE.
+  END SUBROUTINE Disable_RIM_Potential_IPE_Electrodynamics
 
 
   SUBROUTINE Build_IPE_Electrodynamics( eldyn, nFluxTube, NLP, NMP, dynamo, mp_low, mp_high, halo, rc )
@@ -81,6 +111,8 @@ CONTAINS
     REAL(prec) :: theta130_rad
 
     IF ( PRESENT( rc ) ) rc = IPE_SUCCESS
+
+      eldyn % use_rim_potential = .FALSE.
 
       eldyn % nFluxTube = nFluxTube
       eldyn % NLP       = NLP
@@ -168,6 +200,7 @@ CONTAINS
 
     IF (PRESENT(rc)) rc = IPE_SUCCESS
 
+      eldyn % use_rim_potential = .FALSE.
       DEALLOCATE( eldyn % electric_potential, &
                   eldyn % electric_potential2, &
                   eldyn % electric_field, &
@@ -730,6 +763,7 @@ CONTAINS
     use module_init_cons!,only:init_cons
     use module_init_heelis!,only:init_heelis
     use module_highlat!,only: highlat
+    use module_colath, only: colath
     use module_sub_dynamo!,only: dynamo
     use params_module
     use cons_module
@@ -923,9 +957,24 @@ CONTAINS
 ! Can we push the dynamo grid to match the IPE grid (NMP,2*NLP)?
 ! ************************ !
 
-    call highlat( offset1_deg,offset2_deg, potential_model, rc=localrc )
-    if (ipe_error_check(localrc,msg="call to highlat failed", &
-      line=__LINE__, file=__FILE__, rc=rc)) return
+    IF (eldyn % use_rim_potential) THEN
+      ! RIM potential is already on the high-latitude magnetic grid in volts,
+      ! so bypass the empirical highlat model.  The legacy initialization and
+      ! colatitude setup are still required before the dynamo calculation.
+      phihm(1:kmlon,:) = REAL(eldyn % rim_potential(1:kmlon,:))
+      phihm(kmlonp1,:) = phihm(1,:)
+      ! Convert to kV
+      ctpoten = (MAXVAL(phihm(1:kmlon,:)) - MINVAL(phihm(1:kmlon,:)))/1000.0
+      IF( mpi_layer % rank_id == 0 )THEN
+          write(*,*) '***** Rim potential: ', ctpoten, ' kV *****'
+      END IF
+      CALL init_heelis
+      CALL colath(REAL(offset1_deg),REAL(offset2_deg))
+    ELSE
+      call highlat( offset1_deg,offset2_deg, potential_model, rc=localrc )
+      if (ipe_error_check(localrc,msg="call to highlat failed", &
+        line=__LINE__, file=__FILE__, rc=rc)) return
+    END IF
 
     call dynamo( rc = localrc )
     if (ipe_error_check(localrc,msg="call to dynamo failed", &

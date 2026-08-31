@@ -88,6 +88,31 @@ module ipeCap
   contains
   !-----------------------------------------------------------------------------
 
+  subroutine CopyAndReplicateImported2DField(vm, field, target, rc)
+    type(ESMF_VM), intent(in) :: vm
+    type(ESMF_Field), intent(in) :: field
+    real(prec), intent(inout) :: target(:,:)
+    integer, intent(out) :: rc
+    integer(ESMF_KIND_I4) :: localStatus(1), globalStatus(1)
+
+    ! Each PET receives only its local latitude slab.  First verify that every
+    ! PET copied its slab successfully, then assemble the complete RIM grid on
+    ! every PET because the IPE flux-tube decomposition needs nonlocal values.
+    call CopyImported2DField(field, target, rc)
+    localStatus = merge(1_ESMF_KIND_I4, 0_ESMF_KIND_I4, rc == ESMF_SUCCESS)
+    call ESMF_VMAllReduce(vm, localStatus, globalStatus, 1, &
+      ESMF_REDUCE_MIN, rc=rc)
+    if (rc /= ESMF_SUCCESS) return
+    if (globalStatus(1) == 0) then
+      call ESMF_LogSetError(ESMF_RC_INTNRL_BAD, &
+        msg="Failed to copy imported RIM field", line=__LINE__, &
+        file=__FILE__, rcToReturn=rc)
+      return
+    end if
+
+    call ReplicateImported2DField(vm, target, rc)
+  end subroutine CopyAndReplicateImported2DField
+
   subroutine CopyImported2DField(field, target, rc)
     type(ESMF_Field), intent(in) :: field
     real(prec), intent(inout) :: target(:,:)
@@ -98,6 +123,7 @@ module ipeCap
 
     rc = ESMF_SUCCESS
     nullify(fieldPtr2d)
+    target = 0.0_prec
 
     call ESMF_FieldGet(field, farrayPtr=fieldPtr2d, rc=rc)
     if (rc /= ESMF_SUCCESS) return
@@ -110,6 +136,22 @@ module ipeCap
     target(istr:iend, jstr:jend) = fieldPtr2d(istr:iend, jstr:jend)
 
   end subroutine CopyImported2DField
+
+  subroutine ReplicateImported2DField(vm, fieldData, rc)
+    type(ESMF_VM), intent(in) :: vm
+    real(prec), intent(inout) :: fieldData(:,:)
+    integer, intent(out) :: rc
+
+    real(prec) :: sendData(size(fieldData)), recvData(size(fieldData))
+
+    ! CopyImported2DField leaves entries outside the local slab at zero, so a
+    ! SUM reduction reconstructs the global nonoverlapping field.
+    sendData = reshape(fieldData, shape(sendData))
+    call ESMF_VMAllReduce(vm, sendData, recvData, size(fieldData), &
+      ESMF_REDUCE_SUM, rc=rc)
+    if (rc /= ESMF_SUCCESS) return
+    fieldData = reshape(recvData, shape(fieldData))
+  end subroutine ReplicateImported2DField
 
   subroutine SetTestCond(name, field, ptr2d, rc)
     character(len=*), intent(in) :: name
@@ -410,6 +452,9 @@ module ipeCap
     nullify(is % model % rim_epot)
     nullify(is % model % rim_aver)
     nullify(is % model % rim_diff)
+    is % model % rim_epot_received = .false.
+    is % model % rim_aver_received = .false.
+    is % model % rim_diff_received = .false.
 
     ipe => is % model % ipe
 
@@ -689,6 +734,7 @@ module ipeCap
     type(ESMF_Clock)   :: clock
     type(ESMF_Time)    :: currTime
     type(ESMF_State)   :: importState, exportState
+    type(ESMF_VM)      :: vm
     type(ESMF_Field), pointer :: fieldList(:)
 
     type(IPE_InternalState_Type)  :: is
@@ -787,6 +833,17 @@ module ipeCap
       return  ! bail out
     end if
 
+    ! Imported forcing is valid for one ModelAdvance call only.  Disable the
+    ! previous forcing until all required fields are received successfully.
+    call ipe % plasma % Disable_RIM_Aurora()
+    call ipe % eldyn % Disable_RIM_Potential()
+    this % rim_epot_received = .false.
+    this % rim_aver_received = .false.
+    this % rim_diff_received = .false.
+
+    call ESMF_GridCompGet(gcomp, vm=vm, rc=rc)
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+      line=__LINE__, file=__FILE__)) return
     kps = 1
     lps = ipe % mpi_layer % lp_low
     mps = ipe % mpi_layer % mp_low
@@ -796,10 +853,10 @@ module ipeCap
     nullify(fieldList, connectedList, standardNameList)
 
     if (advanceCount > 0) then
-      call NUOPC_GetStateMemberLists(importState, &
+    call NUOPC_GetStateMemberLists(importState, &
         StandardNameList=standardNameList, ConnectedList=connectedList, &
         fieldList=fieldList, nestedFlag=.true., rc=rc)
-      if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
+    if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
         line=__LINE__,  &
         file=__FILE__)) &
         return  ! bail out
@@ -857,15 +914,36 @@ module ipeCap
         else
           ! RIM->IPE fields are 2-D grid fields. Import and retain them, but
           ! do not yet modify the active IPE electrodynamics solve.
-          select case (trim(standardNameList(item)))            
+          ! RIM sends kmlon unique longitudes.  Restore the duplicate periodic
+          ! endpoint expected by the legacy IPE arrays after each successful
+          ! field import.
+          select case (trim(standardNameList(item)))
             case ("jFac")
-              call CopyImported2DField(fieldList(item), this % rim_jfac, rc)
+              call CopyAndReplicateImported2DField(vm, fieldList(item), &
+                this % rim_jfac, rc)
+              if (rc == ESMF_SUCCESS) &
+                this % rim_jfac(kmlonp1,:) = this % rim_jfac(1,:)
             case ("Epot")
-              call CopyImported2DField(fieldList(item), this % rim_epot, rc)
+              call CopyAndReplicateImported2DField(vm, fieldList(item), &
+                this % rim_epot, rc)
+              if (rc == ESMF_SUCCESS) then
+                this % rim_epot(kmlonp1,:) = this % rim_epot(1,:)
+                this % rim_epot_received = .true.
+              end if
             case ("Aver")
-              call CopyImported2DField(fieldList(item), this % rim_aver, rc)
+              call CopyAndReplicateImported2DField(vm, fieldList(item), &
+                this % rim_aver, rc)
+              if (rc == ESMF_SUCCESS) then
+                this % rim_aver(kmlonp1,:) = this % rim_aver(1,:)
+                this % rim_aver_received = .true.
+              end if
             case ("Diff")
-              call CopyImported2DField(fieldList(item), this % rim_diff, rc)
+              call CopyAndReplicateImported2DField(vm, fieldList(item), &
+                this % rim_diff, rc)
+              if (rc == ESMF_SUCCESS) then
+                this % rim_diff(kmlonp1,:) = this % rim_diff(1,:)
+                this % rim_diff_received = .true.
+              end if
             case default
               cycle
           end select
@@ -920,6 +998,19 @@ module ipeCap
         file=__FILE__,  &
         rcToReturn=rc)) &
         return  ! bail out
+    end if
+
+    ! Startup imports are intentionally ignored.  On later advances, activate
+    ! a forcing only when all fields required by that forcing arrived now.
+    if (advanceCount > 0 .and. this % rim_epot_received) then
+      call ipe % eldyn % Set_RIM_Potential(this % rim_epot, rc)
+      if (rc /= ESMF_SUCCESS) return
+    end if
+
+    if (advanceCount > 0 .and. this % rim_aver_received .and. &
+        this % rim_diff_received) then
+      call ipe % plasma % Set_RIM_Aurora(this % rim_aver, this % rim_diff, rc)
+      if (rc /= ESMF_SUCCESS) return
     end if
 
     ! -- advance IPE model
