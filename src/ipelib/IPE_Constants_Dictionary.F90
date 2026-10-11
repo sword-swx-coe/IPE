@@ -50,4 +50,10 @@ MODULE IPE_Constants_Dictionary
   REAL(prec), PARAMETER :: m_to_km     = 1.e-03_prec
   REAL(prec), PARAMETER :: cm_3_to_m_3 = 1.e+06_prec
 
+  ! Hemisphere indices, matching plasma % conductivities(:,ihem,:,:) and the
+  ! trailing dimension of eldyn % electric_potential/electric_field/v_ExB_apex
+  ! (NORTH: flux-tube points 1..flux_tube_midpoint; SOUTH: midpoint+1..flux_tube_max)
+  INTEGER, PARAMETER :: NORTH = 1
+  INTEGER, PARAMETER :: SOUTH = 2
+
 END MODULE IPE_Constants_Dictionary

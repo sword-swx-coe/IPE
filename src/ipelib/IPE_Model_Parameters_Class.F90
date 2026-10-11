@@ -95,6 +95,7 @@ MODULE IPE_Model_Parameters_Class
      REAL(prec) :: offset1_deg
      REAL(prec) :: offset2_deg
      INTEGER    :: potential_model
+     INTEGER    :: exb_hemispheric ! 0 = one NH-footpoint ExB drift per flux tube (legacy, default); 1 = separate NH/SH drifts (split-tube transport)
      REAL(prec) :: hpeq
      INTEGER    :: transport_highlat_lp
      INTEGER    :: perp_transport_max_lp
@@ -196,6 +197,7 @@ CONTAINS
     REAL(prec) :: offset1_deg
     REAL(prec) :: offset2_deg
     INTEGER    :: potential_model
+    INTEGER    :: exb_hemispheric
     REAL(prec) :: hpeq
     INTEGER    :: transport_highlat_lp
     INTEGER    :: perp_transport_max_lp
@@ -253,7 +255,8 @@ CONTAINS
     NAMELIST / ElDyn / dynamo_efield
     NAMELIST / OPERATIONAL / &
          colfac, offset1_deg, offset2_deg, potential_model, hpeq, &
-         transport_highlat_lp, perp_transport_max_lp, vertical_wind_limit
+         transport_highlat_lp, perp_transport_max_lp, vertical_wind_limit, &
+         exb_hemispheric
     NAMELIST / MILE / &
          mile_verbose, mile_efield, mile_aurora, mile_dir, &
          amiefilenorth, amiefilesouth
@@ -335,6 +338,7 @@ CONTAINS
     offset1_deg           = 5.0_prec
     offset2_deg           = 20.0_prec
     potential_model       = 2
+    exb_hemispheric       = 0   ! 0 = legacy NH-footpoint drift for whole tube; 1 = split-tube NH/SH drifts
     hpeq                  = 0.0_prec
     transport_highlat_lp  = 30
     perp_transport_max_lp = 151
@@ -583,6 +587,7 @@ CONTAINS
    params % dynamo_efield             = dynamo_efield
    params % ipe_has_import            = ipe_has_import
    params % potential_model           = potential_model
+   params % exb_hemispheric           = exb_hemispheric
    params % transport_highlat_lp      = transport_highlat_lp
    params % perp_transport_max_lp     = perp_transport_max_lp
    IF ( mpi_layer % rank_id == 0 ) THEN
@@ -629,6 +634,13 @@ CONTAINS
    params % offset2_deg             = offset2_deg
    params % hpeq                    = hpeq
    params % vertical_wind_limit     = vertical_wind_limit
+
+   ! ExB hemisphere mode: 0 = one drift per flux tube taken at the NH
+   ! footpoint (legacy, default), 1 = separate NH/SH drifts (split-tube).
+   IF ( ipe_status_check( params % exb_hemispheric == 0 .OR. &
+        params % exb_hemispheric == 1, &
+        msg="exb_hemispheric must be 0 (legacy) or 1 (split-tube)", &
+        line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
    params % n_model_updates = &
         INT( ( params % end_time - params % start_time ) / &
