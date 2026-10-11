@@ -314,7 +314,7 @@ CONTAINS
             ipe % forcing, &
             ipe % time_tracker, &
             ipe % mpi_layer, &
-            ipe % eldyn % v_ExB_apex(:,:,:,NORTH), &
+            ipe % eldyn % v_ExB_apex, &
             ipe % parameters % time_step, &
             ipe % parameters % colfac, &
             ipe % parameters % hpeq, &
@@ -778,6 +778,17 @@ CONTAINS
     CALL ipe % io % write("ExB_North", &
         ipe % eldyn % v_ExB_apex(2, 1:ipe % grid % NLP, ipe % mpi_layer % mp_low:ipe % mpi_layer % mp_high, NORTH))
     IF (ipe % io % err % check(msg="Unable to write dataset ExB_East", &
+        file=__FILE__, line=__LINE__)) RETURN
+    ! Southern-hemisphere leg of the apex ExB drift [m/s], same components as
+    ! ExB_East/ExB_North (v_ExB_apex(1:2,...,SOUTH)); equal to them when
+    ! exb_hemispheric = 0.
+    CALL ipe % io % write("ExB_East_S", &
+        ipe % eldyn % v_ExB_apex(1, 1:ipe % grid % NLP, ipe % mpi_layer % mp_low:ipe % mpi_layer % mp_high, SOUTH))
+    IF (ipe % io % err % check(msg="Unable to write dataset ExB_East_S", &
+        file=__FILE__, line=__LINE__)) RETURN
+    CALL ipe % io % write("ExB_North_S", &
+        ipe % eldyn % v_ExB_apex(2, 1:ipe % grid % NLP, ipe % mpi_layer % mp_low:ipe % mpi_layer % mp_high, SOUTH))
+    IF (ipe % io % err % check(msg="Unable to write dataset ExB_North_S", &
         file=__FILE__, line=__LINE__)) RETURN
 
     CALL ipe % io % write("EFlux", &
