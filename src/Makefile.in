@@ -833,6 +833,9 @@ uninstall-am: uninstall-binPROGRAMS uninstall-libLIBRARIES
 @COUPLED_TRUE@libipm_a-ipeMethods.$(OBJEXT): libipm_a-IPE_Wrapper.$(OBJEXT)
 @COUPLED_TRUE@libipm_a-IPE_Wrapper.$(OBJEXT): $(builddir)/ipelib/libipe.a
 
+# Recompile the driver when model modules or derived-type layouts change.
+@COUPLED_FALSE@ipe_x-IPE_Driver.$(OBJEXT): $(builddir)/ipelib/libipe.a
+
 .PHONY: clean-modules
 
 clean-modules:

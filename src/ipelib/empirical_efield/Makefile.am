@@ -1,9 +1,10 @@
 noinst_LIBRARIES = libefield.a
 
-libefield_a_SOURCES = apex_sunloc_empirical.f efield_ipe.f weimer2005_ipe.f
+libefield_a_SOURCES = apex_sunloc_empirical.f efield_ipe.F90 weimer2005_ipe.f
 
 
 libefield_a_FFLAGS = $(FC_MODINC) . $(FC_MODINC) ../shared
+libefield_a_FCFLAGS = $(libefield_a_FFLAGS)
 
 EXTRA_DIST = apex_sunloc.f
 

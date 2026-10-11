@@ -1,3 +1,26 @@
+
+subroutine get_unit(ipetime, unit)
+
+  USE IPE_Precision
+
+  implicit none
+  
+  real(prec) :: ipetime
+  character(6) :: unit
+
+  if (ipetime < 120) then
+     unit = ' (sec)'
+  else
+     if (ipetime < 7200) then
+        unit = ' (min)'
+        ipetime = ipetime / 60.0
+     else
+        unit = ' (hrs)'
+        ipetime = ipetime / 3600.0
+     endif
+  endif
+end subroutine get_unit
+
 MODULE IPE_Time_Class
 
 USE IPE_Precision
@@ -34,8 +57,6 @@ IMPLICIT NONE
     PROCEDURE :: Calculate_Day_Difference
 
   END TYPE IPE_Time
-
-
 
 CONTAINS
 
@@ -327,7 +348,7 @@ CONTAINS
       ut = REAL(hour*60 + minute,prec) ! [ minutes ]
 
 
-      diff_minutes = REAL( day_diff*86400, prec ) + time_tracker % utime/60.0_prec - ut
+      diff_minutes = REAL( day_diff*1440, prec ) + time_tracker % utime/60.0_prec - ut
 
   END FUNCTION Calculate_Date_Difference
 
@@ -356,8 +377,6 @@ CONTAINS
       CALL time_tracker % Calculate_DayNumber( )
 
       day_diff = time_tracker % day_number - day_number
-
-
 
   END FUNCTION Calculate_Day_Difference
 

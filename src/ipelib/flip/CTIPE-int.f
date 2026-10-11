@@ -479,18 +479,18 @@ C.... Written by P. Richards June-September 2010.
 
       !.. Upload densities and velocities to ION_DEN_VEL module
       DO J=JMIN,JMAX
-      DO I=1,ISPEC
-        XIONN(I,J)=XIONNX(I,J)*M3_to_CM3
-        XIONV(I,J)=XIONVX(I,J)*M_to_CM
-      ENDDO
+        DO I=1,ISPEC
+          XIONN(I,J)=XIONNX(I,J)*M3_to_CM3
+          XIONV(I,J)=XIONVX(I,J)*M_to_CM
+        ENDDO
       ENDDO
 
       !.. Transfer Te and Ti to FLIP variable TI
       DO J=JMIN,JMAX
-      DO I=1,3
-        temp_ti_te(I,J)=TE_TIX(I,J)
-        EHT(I,J)=EHTX(I,J)
-      ENDDO
+        DO I=1,3
+          temp_ti_te(I,J)=TE_TIX(I,J)
+          EHT(I,J)=EHTX(I,J)
+        ENDDO
       ENDDO
 
       !.. Upload thermosphere parameters to THERMOSPHERE module
@@ -571,12 +571,11 @@ C.... Written by P. Richards June-September 2010.
 !
 ! GHGM - had an issue at 158 - trying 156 as the max
 !
-      IF(lp.LE.158) THEN
-
-      CALL PE2S(F107,F107A,N,temp_ti_te,FPAS,electron_density,UVFAC,
-     >          COLUM,IHEPLS,INPLS,INNO,mp,lp)
-
-      ENDIF
+        IF (lp.LE.158) THEN
+          CALL PE2S(F107, F107A, N, temp_ti_te, FPAS, 
+     >               electron_density, UVFAC, COLUM, 
+     >               IHEPLS, INPLS, INNO, mp, lp)
+        ENDIF
 
       ENDIF
 

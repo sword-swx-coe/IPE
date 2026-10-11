@@ -1,0 +1,25 @@
+
+BASEDIR=/home/ridley/Software/IPE/
+
+
+BUILDDIR = ${BASEDIR}/build
+DIRSFILE = ${BUILDDIR}/Makefile.dirs
+
+LIBDIR = ${BASEDIR}/lib
+BINDIR = ${BASEDIR}/bin
+
+RUNDIR = ${BASEDIR}/run
+DATADIR = ${BASEDIR}/srcData
+
+MILEDIR = ${BASEDIR}/ext/Electrodynamics
+
+FLIPDIR = ${BASEDIR}/src/ipelib/flip
+MSISDIR = ${BASEDIR}/src/ipelib/msise00
+SHAREDDIR = ${BASEDIR}/src/ipelib/shared
+EFIELDDIR = ${BASEDIR}/src/ipelib/empirical_efield
+DYNAMODIR = ${BASEDIR}/src/ipelib/dynamo
+IPEDIR = ${BASEDIR}/src/ipelib
+MAINDIR = ${BASEDIR}/src
+
+SCRIPTDIR = /home/ridley/Software/GITM/share/Scripts
+

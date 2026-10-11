@@ -135,7 +135,8 @@ am__v_AR_0 = @echo "  AR      " $@;
 am__v_AR_1 = 
 libshared_a_AR = $(AR) $(ARFLAGS)
 libshared_a_LIBADD =
-am_libshared_a_OBJECTS = ipe_error_module.$(OBJEXT)
+am_libshared_a_OBJECTS = libshared_a-ipe_error_module.$(OBJEXT) \
+	libshared_a-ModMile.$(OBJEXT)
 libshared_a_OBJECTS = $(am_libshared_a_OBJECTS)
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
@@ -150,6 +151,10 @@ am__v_at_ = $(am__v_at_@AM_DEFAULT_V@)
 am__v_at_0 = @
 am__v_at_1 = 
 DEFAULT_INCLUDES = -I.@am__isrc@
+AM_V_lt = $(am__v_lt_@AM_V@)
+am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
+am__v_lt_0 = --silent
+am__v_lt_1 =
 PPFCCOMPILE = $(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) \
 	$(AM_CPPFLAGS) $(CPPFLAGS) $(AM_FCFLAGS) $(FCFLAGS)
 AM_V_PPFC = $(am__v_PPFC_@AM_V@)
@@ -306,8 +311,8 @@ top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 lib_LIBRARIES = libshared.a
-libshared_a_SOURCES = ipe_error_module.F90
-libipe_a_FCFLAGS = 
+libshared_a_SOURCES = ipe_error_module.F90 ModMile.F90
+libshared_a_FCFLAGS =
 all: all-am
 
 .SUFFIXES:
@@ -389,6 +394,18 @@ distclean-compile:
 
 .F90.obj:
 	$(AM_V_PPFC)$(PPFCCOMPILE) -c -o $@ `$(CYGPATH_W) '$<'`
+
+libshared_a-ipe_error_module.o: ipe_error_module.F90
+	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libshared_a_FCFLAGS) $(FCFLAGS) -c -o libshared_a-ipe_error_module.o `test -f 'ipe_error_module.F90' || echo '$(srcdir)/'`ipe_error_module.F90
+
+libshared_a-ipe_error_module.obj: ipe_error_module.F90
+	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libshared_a_FCFLAGS) $(FCFLAGS) -c -o libshared_a-ipe_error_module.obj `if test -f 'ipe_error_module.F90'; then $(CYGPATH_W) 'ipe_error_module.F90'; else $(CYGPATH_W) '$(srcdir)/ipe_error_module.F90'; fi`
+
+libshared_a-ModMile.o: ModMile.F90
+	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libshared_a_FCFLAGS) $(FCFLAGS) -c -o libshared_a-ModMile.o `test -f 'ModMile.F90' || echo '$(srcdir)/'`ModMile.F90
+
+libshared_a-ModMile.obj: ModMile.F90
+	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libshared_a_FCFLAGS) $(FCFLAGS) -c -o libshared_a-ModMile.obj `if test -f 'ModMile.F90'; then $(CYGPATH_W) 'ModMile.F90'; else $(CYGPATH_W) '$(srcdir)/ModMile.F90'; fi`
 
 ID: $(am__tagged_files)
 	$(am__define_uniq_tagged_files); mkid -fID $$unique
