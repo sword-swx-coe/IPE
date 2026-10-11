@@ -407,19 +407,33 @@ CONTAINS
                                   parameters % offset1_deg, &
                                   parameters % offset2_deg, &
                                   parameters % potential_model, &
+                                  parameters % exb_hemispheric, &
                                   mpi_layer, rc=localrc )
       IF ( ipe_error_check(localrc, msg="call to Dynamo_Wrapper failed", &
         line=__LINE__, file=__FILE__, rc=rc) ) RETURN
 
     ELSE
 
-      CALL eldyn % Empirical_E_Field_Wrapper( grid, forcing, time_tracker, mpi_layer, rc=localrc )
+      CALL eldyn % Empirical_E_Field_Wrapper( grid, forcing, time_tracker, &
+                                             parameters % exb_hemispheric, &
+                                             mpi_layer, rc=localrc )
       IF ( ipe_error_check(localrc, msg="call to Empirical_E_Field_Wrapper failed", &
         line=__LINE__, file=__FILE__, rc=rc) ) RETURN
 
       ! Calculate the potential gradient in IPE coordinates.
-      CALL eldyn % Calculate_Potential_Gradient( grid )
+      CALL eldyn % Calculate_Potential_Gradient( grid, NORTH )
+      IF ( parameters % exb_hemispheric == 1 ) &
+        CALL eldyn % Calculate_Potential_Gradient( grid, SOUTH )
 
+    ENDIF
+
+    ! Legacy mode (exb_hemispheric = 0): the SH footpoint is not sampled and
+    ! the whole flux tube uses the NH-footpoint field, as before. Mirror the
+    ! NORTH slot into the SOUTH slot so that the split-tube ExB velocity and
+    ! transport reproduce the previous single-drift result bit for bit.
+    IF ( parameters % exb_hemispheric == 0 ) THEN
+      eldyn % electric_potential(:,:,SOUTH) = eldyn % electric_potential(:,:,NORTH)
+      eldyn % electric_field(:,:,:,SOUTH)   = eldyn % electric_field(:,:,:,NORTH)
     ENDIF
 
     ! Calculate ExB drift velocity
@@ -428,7 +442,7 @@ CONTAINS
   END SUBROUTINE Update_IPE_Electrodynamics
 
 
-  SUBROUTINE Empirical_E_Field_Wrapper( eldyn, grid, forcing, time_tracker, mpi_layer, rc )
+  SUBROUTINE Empirical_E_Field_Wrapper( eldyn, grid, forcing, time_tracker, exb_hemispheric, mpi_layer, rc )
 
     IMPLICIT NONE
 
@@ -436,6 +450,7 @@ CONTAINS
     TYPE( IPE_Grid ),             INTENT(in)    :: grid
     TYPE( IPE_Forcing ),          INTENT(in)    :: forcing
     TYPE( IPE_Time ),             INTENT(in)    :: time_tracker
+    INTEGER,                      INTENT(in)    :: exb_hemispheric ! 0 = NH footpoint only; 1 = NH and SH footpoints
     TYPE( IPE_MPI_Layer ),        INTENT(in)    :: mpi_layer
     INTEGER, OPTIONAL,            INTENT(out)   :: rc
 
@@ -446,7 +461,8 @@ CONTAINS
     REAL(prec) :: potent_local(0:nmlon,0:nmlat)
     REAL(prec) :: mlt_local(0:nmlon)
     REAL(prec) :: colat_local(0:nmlat)
-    REAL(prec) :: colat_sample(1:grid % NLP)
+    REAL(prec) :: colat_sample(1:grid % NLP,NORTH:SOUTH)
+    INTEGER    :: ihem, last_hem
 
     IF ( PRESENT( rc ) ) rc = IPE_SUCCESS
 
@@ -476,7 +492,17 @@ CONTAINS
     potent_local = potent
     mlt_local    = ylonm
     colat_local  = rtd * theta90_rad
-    colat_sample = grid % magnetic_colatitude(1,1:grid % NLP)
+
+    ! Sample the potential at the 90 km footpoint(s) of each flux tube:
+    ! NORTH at i = 1, SOUTH at i = flux_tube_max(lp) (exb_hemispheric = 1 only).
+    colat_sample(:,NORTH) = grid % magnetic_colatitude(1,1:grid % NLP)
+    DO lp = 1, grid % NLP
+      colat_sample(lp,SOUTH) = grid % magnetic_colatitude(grid % flux_tube_max(lp),lp)
+    ENDDO
+    last_hem = NORTH
+    IF ( exb_hemispheric == 1 ) last_hem = SOUTH
+
+    DO ihem = NORTH, last_hem
     CALL eldyn % Regrid_Potential( &
          grid, &
          mpi_layer, &
@@ -484,9 +510,10 @@ CONTAINS
          potent_local, &
          mlt_local, &
          colat_local, &
-         0, nmlon, nmlat, NORTH, colat_sample, rc=localrc )
+         0, nmlon, nmlat, ihem, colat_sample(:,ihem), rc=localrc )
     IF ( ipe_error_check( localrc, msg="call to Regrid_Potential failed", &
          line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+    ENDDO
 
   END SUBROUTINE Empirical_E_Field_Wrapper
 
@@ -498,7 +525,7 @@ CONTAINS
     TYPE( IPE_Grid ), INTENT(in)                :: grid
     TYPE( IPE_MPI_Layer ), INTENT(in)  :: mpi_layer
     ! Local
-    INTEGER    :: mp, lp, i_90km
+    INTEGER    :: mp, lp, i_90km, ihem
     REAL(prec) :: max_v_exb
     REAL(prec) :: v_boost_factor
 
@@ -506,9 +533,15 @@ CONTAINS
 
     DO mp = grid % mp_low, grid % mp_high
       DO lp = 1, grid % NLP
-         eldyn % v_ExB_apex(1,lp,mp,NORTH) = eldyn % electric_field(2,lp,mp,NORTH)/grid % apex_be3(lp,mp)
-         eldyn % v_ExB_apex(2,lp,mp,NORTH) = -eldyn % electric_field(1,lp,mp,NORTH)/grid % apex_be3(lp,mp)
+         ! Apex drift of each hemispheric leg from that leg's footpoint field.
+         ! apex_be3 is constant along the field line, so it serves both legs.
+         DO ihem = NORTH, SOUTH
+           eldyn % v_ExB_apex(1,lp,mp,ihem) = eldyn % electric_field(2,lp,mp,ihem)/grid % apex_be3(lp,mp)
+           eldyn % v_ExB_apex(2,lp,mp,ihem) = -eldyn % electric_field(1,lp,mp,ihem)/grid % apex_be3(lp,mp)
+         ENDDO
          DO i_90km = 1, grid % flux_tube_max(lp)
+            ! Points 1..flux_tube_midpoint(lp) are the NH leg, the rest the SH leg
+            ihem = MERGE( NORTH, SOUTH, i_90km <= grid % flux_tube_midpoint(lp) )
 
 !         eldyn % v_ExB_apex(1,lp,mp) = v_boost_factor * (eldyn % electric_field(2,lp,mp)/grid % apex_be3(lp,mp))
 !         eldyn % v_ExB_apex(2,lp,mp) = v_boost_factor * (-eldyn % electric_field(1,lp,mp)/grid % apex_be3(lp,mp))
@@ -516,16 +549,16 @@ CONTAINS
 ! TWFANG modify the equation and add i_90km (May 2019)
 ! geographic eastward....
             eldyn % v_exb_geographic(1,i_90km,lp,mp) = &
-                 (eldyn % v_ExB_apex(1,lp,mp,NORTH) * grid % apex_e_vectors(1,1,i_90km,lp,mp)) &
-                 + (eldyn % v_ExB_apex(2,lp,mp,NORTH) * grid % apex_e_vectors(1,2,i_90km,lp,mp))
+                 (eldyn % v_ExB_apex(1,lp,mp,ihem) * grid % apex_e_vectors(1,1,i_90km,lp,mp)) &
+                 + (eldyn % v_ExB_apex(2,lp,mp,ihem) * grid % apex_e_vectors(1,2,i_90km,lp,mp))
 ! geographic northward....
             eldyn % v_exb_geographic(2,i_90km,lp,mp) = &
-                 (eldyn % v_ExB_apex(1,lp,mp,NORTH) * grid % apex_e_vectors(2,1,i_90km,lp,mp)) &
-                 + (eldyn % v_ExB_apex(2,lp,mp,NORTH) * grid % apex_e_vectors(2,2,i_90km,lp,mp))
+                 (eldyn % v_ExB_apex(1,lp,mp,ihem) * grid % apex_e_vectors(2,1,i_90km,lp,mp)) &
+                 + (eldyn % v_ExB_apex(2,lp,mp,ihem) * grid % apex_e_vectors(2,2,i_90km,lp,mp))
 ! geographic upwards....
             eldyn % v_exb_geographic(3,i_90km,lp,mp) = &
-                 (eldyn % v_ExB_apex(1,lp,mp,NORTH) * grid % apex_e_vectors(3,1,i_90km,lp,mp)) &
-                 + (eldyn % v_ExB_apex(2,lp,mp,NORTH) * grid % apex_e_vectors(3,2,i_90km,lp,mp))
+                 (eldyn % v_ExB_apex(1,lp,mp,ihem) * grid % apex_e_vectors(3,1,i_90km,lp,mp)) &
+                 + (eldyn % v_ExB_apex(2,lp,mp,ihem) * grid % apex_e_vectors(3,2,i_90km,lp,mp))
         ENDDO
 
       ENDDO
@@ -536,14 +569,18 @@ CONTAINS
   END SUBROUTINE Calculate_ExB_Velocity
 
 
-  SUBROUTINE Calculate_Potential_Gradient( eldyn, grid )
+  SUBROUTINE Calculate_Potential_Gradient( eldyn, grid, ihem )
     ! Uses 2nd order centered differencing (on the apex grid) to calculate the
     ! electric field components from the potential attribute from the
     ! IPE_Electrodynamics class.
     ! The electric field gradient is calculated using Sections 3 and 4 of A.D.
     ! Richmond (1995)
+    ! ihem selects the hemisphere slot (NORTH or SOUTH). The same formula and
+    ! the NH colatitude spacing (= |lambda_m| spacing of both legs) are used
+    ! for both slots; no sign change is applied for the SOUTH slot.
     CLASS( IPE_Electrodynamics ), INTENT(inout) :: eldyn
     TYPE( IPE_Grid ),             INTENT(in)    :: grid
+    INTEGER,                      INTENT(in)    :: ihem
 
     ! Local
     INTEGER    :: mp, lp
@@ -565,8 +602,8 @@ CONTAINS
         coslam = cos( half_pi - grid % magnetic_colatitude(1,lp) )
         d_mp   = coslam*r*( grid % magnetic_longitude(mp+1) - grid % magnetic_longitude(mp-1) )
 
-        eldyn % electric_field(1,lp,mp,NORTH) = -( eldyn % electric_potential(lp,mp+1,NORTH) - &
-                                            eldyn % electric_potential(lp,mp-1,NORTH) )/d_mp
+        eldyn % electric_field(1,lp,mp,ihem) = -( eldyn % electric_potential(lp,mp+1,ihem) - &
+                                            eldyn % electric_potential(lp,mp-1,ihem) )/d_mp
       ENDDO
     ENDDO
 
@@ -583,8 +620,8 @@ CONTAINS
       sinim  = 2.0_prec*sqrt( 1.0_prec - coslam*coslam )/sqrt( 4.0_prec - 3.0_prec*coslam*coslam )
       d_lp = sinim*r*( grid % magnetic_colatitude(1,lp+1) - grid % magnetic_colatitude(1,lp) )
 
-      eldyn % electric_field(2,lp,mp,NORTH) = -( eldyn % electric_potential(lp+1,mp,NORTH) - &
-                                          eldyn % electric_potential(lp,mp,NORTH) )/d_lp
+      eldyn % electric_field(2,lp,mp,ihem) = -( eldyn % electric_potential(lp+1,mp,ihem) - &
+                                          eldyn % electric_potential(lp,mp,ihem) )/d_lp
 
       DO lp = 2, grid % NLP-1
 
@@ -592,8 +629,8 @@ CONTAINS
         sinim  = 2.0_prec*sqrt( 1.0_prec - coslam*coslam )/sqrt( 4.0_prec - 3.0_prec*coslam*coslam )
         d_lp = sinim*r*( grid % magnetic_colatitude(1,lp+1) - grid % magnetic_colatitude(1,lp-1) )
 
-        eldyn % electric_field(2,lp,mp,NORTH) = -( eldyn % electric_potential(lp+1,mp,NORTH) - &
-                                            eldyn % electric_potential(lp-1,mp,NORTH) )/d_lp
+        eldyn % electric_field(2,lp,mp,ihem) = -( eldyn % electric_potential(lp+1,mp,ihem) - &
+                                            eldyn % electric_potential(lp-1,mp,ihem) )/d_lp
 
       ENDDO
 
@@ -602,8 +639,8 @@ CONTAINS
       sinim  = 2.0_prec*sqrt( 1.0_prec - coslam*coslam )/sqrt( 4.0_prec - 3.0_prec*coslam*coslam )
       d_lp = sinim*r*( grid % magnetic_colatitude(1,lp) - grid % magnetic_colatitude(1,lp-1) )
 
-      eldyn % electric_field(2,lp,mp,NORTH) = -( eldyn % electric_potential(lp,mp,NORTH) - &
-                                          eldyn % electric_potential(lp-1,mp,NORTH) )/d_lp
+      eldyn % electric_field(2,lp,mp,ihem) = -( eldyn % electric_potential(lp,mp,ihem) - &
+                                          eldyn % electric_potential(lp-1,mp,ihem) )/d_lp
 
     ENDDO
 
@@ -921,7 +958,7 @@ CONTAINS
 
 
   SUBROUTINE Dynamo_Wrapper(eldyn,grid,forcing,time_tracker, plasma, &
-                            offset1_deg,offset2_deg,potential_model, mpi_layer, rc)
+                            offset1_deg,offset2_deg,potential_model, exb_hemispheric, mpi_layer, rc)
 
     use module_init_cons!,only:init_cons
     use module_init_heelis!,only:init_heelis
@@ -942,6 +979,7 @@ CONTAINS
     TYPE( IPE_MPI_Layer ),        INTENT(in)    :: mpi_layer
     REAL(prec),                   INTENT(in)    :: offset1_deg,offset2_deg
     INTEGER,                      INTENT(in)    :: potential_model
+    INTEGER,                      INTENT(in)    :: exb_hemispheric ! 0 = NH footpoint only; 1 = NH and SH footpoints
     INTEGER, OPTIONAL,            INTENT(out)   :: rc
 
     INTEGER, PARAMETER :: dyn_midpoint=48 
@@ -960,7 +998,8 @@ CONTAINS
     REAL(prec) :: ed1dy_map(82,kmlat)
     REAL(prec) :: ed2dy_map(82,kmlat)
     real(prec) :: pot_map(82,kmlat)
-    REAL(prec) :: colat_sample(1:grid % NLP)
+    REAL(prec) :: colat_sample(1:grid % NLP,NORTH:SOUTH)
+    INTEGER    :: last_hem
 
     IF ( PRESENT( rc ) ) rc = IPE_SUCCESS
 
@@ -1186,19 +1225,31 @@ CONTAINS
     ! This subroutine is really just an interpolation routine to move
     ! a variable from one grid to the IPE grid.  It just fills in the
     ! electric_potential variable.
-    colat_sample = grid % magnetic_colatitude(1,1:grid % NLP)
+    !
+    ! Each quantity is sampled at the 90 km footpoint(s) of each flux tube:
+    ! NORTH at i = 1, SOUTH at i = flux_tube_max(lp) (exb_hemispheric = 1
+    ! only). ed1dy/ed2dy [V/m] already carry the apex sign convention for
+    ! the SH rows (module_threed), so no sign change is applied here.
+    colat_sample(:,NORTH) = grid % magnetic_colatitude(1,1:grid % NLP)
+    DO i = 1, grid % NLP
+      colat_sample(i,SOUTH) = grid % magnetic_colatitude(grid % flux_tube_max(i),i)
+    ENDDO
+    last_hem = NORTH
+    IF ( exb_hemispheric == 1 ) last_hem = SOUTH
+
+    DO ihem = NORTH, last_hem
     CALL eldyn % Regrid_Potential( &
          grid, mpi_layer, &
          time_tracker, &
          ed1dy_map, &
          xlonm_deg_map, &
          ylatm_deg_map, &
-         1, 82,kmlat, NORTH, colat_sample, rc=localrc )
+         1, 82,kmlat, ihem, colat_sample(:,ihem), rc=localrc )
     IF ( ipe_error_check( localrc, &
          msg="call to Regrid_Potential (ed1dy_map) failed", &
          line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
-    eldyn % electric_field(1,:,:,NORTH) = &
-         eldyn % electric_potential(:,grid % mp_low:grid % mp_high,NORTH)
+    eldyn % electric_field(1,:,:,ihem) = &
+         eldyn % electric_potential(:,grid % mp_low:grid % mp_high,ihem)
 
     CALL eldyn % Regrid_Potential( &
          grid, &
@@ -1207,13 +1258,15 @@ CONTAINS
          ed2dy_map, &
          xlonm_deg_map, &
          ylatm_deg_map, &
-         1, 82,kmlat, NORTH, colat_sample, rc=localrc )
+         1, 82,kmlat, ihem, colat_sample(:,ihem), rc=localrc )
     IF ( ipe_error_check( localrc, &
          msg="call to Regrid_Potential (ed2dy_map) failed", &
          line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
-    eldyn % electric_field(2,:,:,NORTH) = &
-         eldyn % electric_potential(:,grid % mp_low:grid % mp_high,NORTH)
+    eldyn % electric_field(2,:,:,ihem) = &
+         eldyn % electric_potential(:,grid % mp_low:grid % mp_high,ihem)
 
+    ! Diagnostic potential phim [V]; leaves electric_potential(:,:,ihem)
+    ! holding the potential rather than ed2.
     CALL eldyn % Regrid_Potential( &
          grid, &
          mpi_layer, &
@@ -1221,10 +1274,11 @@ CONTAINS
          pot_map, &
          xlonm_deg_map, &
          ylatm_deg_map, &
-         1, 82,kmlat, NORTH, colat_sample, rc=localrc )
+         1, 82,kmlat, ihem, colat_sample(:,ihem), rc=localrc )
     IF ( ipe_error_check( localrc, &
          msg="call to Regrid_Potential (ed2dy_map) failed", &
          line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+    ENDDO
 
   END SUBROUTINE Dynamo_Wrapper
 
