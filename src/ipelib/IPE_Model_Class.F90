@@ -771,16 +771,16 @@ CONTAINS
         ipe % eldyn % electric_potential(1:ipe % grid % NLP, ipe % mpi_layer % mp_low:ipe % mpi_layer % mp_high, NORTH))
     IF (ipe % io % err % check(msg="Unable to write dataset ElectricPotential", &
         file=__FILE__, line=__LINE__)) RETURN
-    CALL ipe % io % write("ExB_apex_e1", &
+    CALL ipe % io % write("ExB_apex_e1_N", &
         ipe % eldyn % v_ExB_apex(1, 1:ipe % grid % NLP, ipe % mpi_layer % mp_low:ipe % mpi_layer % mp_high, NORTH))
-    IF (ipe % io % err % check(msg="Unable to write dataset ExB_apex_e1", &
+    IF (ipe % io % err % check(msg="Unable to write dataset ExB_apex_e1_N", &
         file=__FILE__, line=__LINE__)) RETURN
-    CALL ipe % io % write("ExB_apex_e2", &
+    CALL ipe % io % write("ExB_apex_e2_N", &
         ipe % eldyn % v_ExB_apex(2, 1:ipe % grid % NLP, ipe % mpi_layer % mp_low:ipe % mpi_layer % mp_high, NORTH))
-    IF (ipe % io % err % check(msg="Unable to write dataset ExB_apex_e2", &
+    IF (ipe % io % err % check(msg="Unable to write dataset ExB_apex_e2_N", &
         file=__FILE__, line=__LINE__)) RETURN
     ! Southern-hemisphere leg of the apex ExB drift [m/s], same components as
-    ! ExB_apex_e1/ExB_apex_e2 (v_ExB_apex(1:2,...,SOUTH)); equal to them when
+    ! ExB_apex_e1_N/ExB_apex_e2_N (v_ExB_apex(1:2,...,SOUTH)); equal to them when
     ! exb_hemispheric = 0.
     CALL ipe % io % write("ExB_apex_e1_S", &
         ipe % eldyn % v_ExB_apex(1, 1:ipe % grid % NLP, ipe % mpi_layer % mp_low:ipe % mpi_layer % mp_high, SOUTH))
