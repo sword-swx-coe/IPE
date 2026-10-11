@@ -4,6 +4,7 @@
 MODULE IPE_Model_Class
 
   USE IPE_Precision
+  USE IPE_Constants_Dictionary, ONLY : NORTH, SOUTH
   USE IPE_Model_Parameters_Class
   USE IPE_Time_Class
   USE IPE_Grid_Class
@@ -313,7 +314,7 @@ CONTAINS
             ipe % forcing, &
             ipe % time_tracker, &
             ipe % mpi_layer, &
-            ipe % eldyn % v_ExB_apex, &
+            ipe % eldyn % v_ExB_apex(:,:,:,NORTH), &
             ipe % parameters % time_step, &
             ipe % parameters % colfac, &
             ipe % parameters % hpeq, &
@@ -767,15 +768,15 @@ CONTAINS
 
     ! Write out electric field stuff:
     CALL ipe % io % write("ElectricPotential", &
-        ipe % eldyn % electric_potential(1:ipe % grid % NLP, ipe % mpi_layer % mp_low:ipe % mpi_layer % mp_high))
+        ipe % eldyn % electric_potential(1:ipe % grid % NLP, ipe % mpi_layer % mp_low:ipe % mpi_layer % mp_high, NORTH))
     IF (ipe % io % err % check(msg="Unable to write dataset ElectricPotential", &
         file=__FILE__, line=__LINE__)) RETURN
     CALL ipe % io % write("ExB_East", &
-        ipe % eldyn % v_ExB_apex(1, 1:ipe % grid % NLP, ipe % mpi_layer % mp_low:ipe % mpi_layer % mp_high))
+        ipe % eldyn % v_ExB_apex(1, 1:ipe % grid % NLP, ipe % mpi_layer % mp_low:ipe % mpi_layer % mp_high, NORTH))
     IF (ipe % io % err % check(msg="Unable to write dataset ExB_East", &
         file=__FILE__, line=__LINE__)) RETURN
     CALL ipe % io % write("ExB_North", &
-        ipe % eldyn % v_ExB_apex(2, 1:ipe % grid % NLP, ipe % mpi_layer % mp_low:ipe % mpi_layer % mp_high))
+        ipe % eldyn % v_ExB_apex(2, 1:ipe % grid % NLP, ipe % mpi_layer % mp_low:ipe % mpi_layer % mp_high, NORTH))
     IF (ipe % io % err % check(msg="Unable to write dataset ExB_East", &
         file=__FILE__, line=__LINE__)) RETURN
 
