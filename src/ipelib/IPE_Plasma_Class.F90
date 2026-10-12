@@ -1414,7 +1414,13 @@ CONTAINS
     !   - ch
     !--------------------------------------------------------------------------
 
-    nMlts = plasma % mp_high - plasma % mp_low + 1
+    ! NOTE: do not reset the module variable nMlts here. The MILE arrays
+    ! (mlts2d, lats2d, eflux2d, avee2d, area2d) are allocated with the halo
+    ! columns included (nMlts = iEnd - iStart + 1 in Build). Resetting it to
+    ! the halo-less count made mile_prepare_aurora_grid pass the wrong leading
+    ! dimension to the IE library from the second step on, so the library wrote
+    ! only the first part of eflux2d/avee2d and the southern-hemisphere rows
+    ! stayed frozen at their first-step values.
     nLats = (grid % NLP) * 2
 
     ! Here we assume a uniform longitude:
