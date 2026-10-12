@@ -5,6 +5,7 @@ USE IPE_Constants_Dictionary
 USE IPE_Common_Routines
 USE IPE_Model_Parameters_Class
 USE ipe_error_module
+USE IPE_Time_Class
 
 IMPLICIT NONE
 
@@ -19,7 +20,10 @@ IMPLICIT NONE
     REAL(prec)              :: current_time
     INTEGER                 :: current_index
     INTEGER                 :: max_read_index
-    !
+
+    TYPE( IPE_Time ) :: start_time
+    CHARACTER(12) :: initial_timestamp
+
     REAL(prec), ALLOCATABLE :: f107(:)
     INTEGER, ALLOCATABLE    :: f107_flag(:)
     REAL(prec), ALLOCATABLE :: f107_81day_avg(:)
@@ -129,7 +133,6 @@ CONTAINS
     forcing % nhemi_power_index = params % nhemi_power_index
     forcing % shemi_power       = params % shemi_power
     forcing % shemi_power_index = params % shemi_power_index
-
     forcing % solarwind_angle    = params % solarwind_angle
     forcing % solarwind_velocity = params % solarwind_velocity
     forcing % solarwind_density  = params % solarwind_density
@@ -141,23 +144,29 @@ CONTAINS
     forcing % emaps     = 0.0_prec
     forcing % cmaps     = 0.0_prec
     forcing % djspectra = 0.0_prec
-    IF( params % use_f107_kp_file )THEN
-      CALL forcing % Read_F107KP_IPE_Forcing( params % f107_kp_file,          &
-                                              params % f107_kp_data_size,     &
-                                              params % f107_kp_read_in_start+1, &
-                                              0,                              &
-                                              params % f107_kp_realtime_interval < 0, &
-                                              localrc )
-      IF( ipe_error_check( localrc, msg="call to Read_F107KP_IPE_Forcing failed", &
-        line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+    IF (params % use_f107_kp_file) THEN
+       CALL forcing % Read_F107KP_IPE_Forcing( &
+            params % f107_kp_file, &
+            params % f107_kp_data_size, &
+            params % f107_kp_read_in_start + 1, &
+            0, &
+            params % f107_kp_realtime_interval < 0, &
+            localrc )
+       IF( ipe_error_check( localrc, &
+            msg="call to Read_F107KP_IPE_Forcing failed", &
+            line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
     ENDIF
 
     CALL forcing % Estimate_AP_from_KP( params % f107_kp_read_in_start+1 )
 
     CALL forcing % Read_Tiros_IPE_Forcing( localrc )
-    IF( ipe_error_check( localrc, msg="call to Read_Tiros_IPE_Forcing failed", &
-      line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+    IF( ipe_error_check( localrc, &
+         msg="call to Read_Tiros_IPE_Forcing failed", &
+         line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
+    ! This is new - let's at least keep track of the start time:
+    CALL forcing % start_time % Build( forcing % initial_timestamp, 2 )
+    
   END SUBROUTINE Build_IPE_Forcing
 
 
@@ -249,40 +258,85 @@ CONTAINS
   END FUNCTION GetKP
 
 
-  SUBROUTINE Update_Current_Index( forcing, params, deltime, rc )
+  SUBROUTINE Update_Current_Index( forcing, params, ipeTime, rc )
 
     IMPLICIT NONE
 
-    CLASS( IPE_Forcing ),          INTENT(inout) :: forcing
+    CLASS( IPE_Forcing ), INTENT(inout) :: forcing
     CLASS( IPE_Model_Parameters ), INTENT(in)    :: params
-    REAL(prec),                    INTENT(in)    :: deltime
-    INTEGER,                       INTENT(out)   :: rc
+    class( ipe_time ), intent(in) :: ipeTime
+    INTEGER, INTENT(out)   :: rc
+
+    integer :: verbose = 0
+
+    real(prec) :: deltime, dtInFile
 
     ! Local
     INTEGER :: localrc
 
     rc = IPE_SUCCESS
 
-    forcing % current_index = INT( deltime / real(params % f107_kp_interval) ) + &
-                                      1 + params % f107_kp_skip_size
+    ! the old way of doing this was that deltime = elapsed time
+    ! new way:
+    !   - calculate the time between the current time and the start time
+    !     of the index file, which is stored in start_time
 
-    if ( params % use_f107_kp_file .and. forcing % current_index > forcing % max_read_index &
-             .and. params % f107_kp_realtime_interval > 0 ) then
-      call forcing % read_f107kp_ipe_forcing( params % f107_kp_file,   &
-                                              params % f107_kp_realtime_interval, &
-                                              forcing % current_index, &
-                                              forcing % max_read_index, &
-                                              params % f107_kp_realtime_interval < 0, &
-                                              localrc )
-      IF( ipe_error_check( localrc, msg="call to Read_F107KP_IPE_Forcing failed", &
-        line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+    deltime = ipeTime  % Calculate_Date_Difference( &
+        forcing % start_time % year, &
+        forcing % start_time % month, &
+        forcing % start_time % day, &
+        forcing % start_time % hour, &
+        forcing % start_time % minute ) * 60.0
+
+    if (forcing % time(2) > forcing % time(1)) then
+       if (verbose > 0) then
+          write(*,*) " -> Overwriting f107_kp_interval with delta-time"
+          write(*,*) " --> this is : ", forcing % time(2) - forcing % time(1)
+       endif
+       dtInFile = forcing % time(2) - forcing % time(1)
+    else
+       dtInFile = real(params % f107_kp_interval)
+    endif
+    
+    forcing % current_index = &
+         INT( deltime / dtInFile ) + 1 + params % f107_kp_skip_size
+
+    if (verbose > 0) then
+      write(*,*) "current_index : ", forcing % current_index
+      write(*,*) 'deltime : ', deltime, &
+           forcing % start_time % day, &
+           forcing % start_time % hour, &
+           forcing % start_time % minute, &
+           ipeTime % day, ipeTime % hour, ipeTime % minute
+    endif
+
+    if ( params % use_f107_kp_file .and. &
+         forcing % current_index > forcing % max_read_index .and. &
+         params % f107_kp_realtime_interval > 0 ) then
+       call forcing % read_f107kp_ipe_forcing( &
+            params % f107_kp_file,   &
+            params % f107_kp_realtime_interval, &
+            forcing % current_index, &
+            forcing % max_read_index, &
+            params % f107_kp_realtime_interval < 0, &
+            localrc )
+       IF( ipe_error_check( localrc, &
+            msg="call to Read_F107KP_IPE_Forcing failed", &
+            line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
     end if
     CALL forcing % Estimate_AP_from_KP( forcing % current_index )
 
   END SUBROUTINE Update_Current_index
 
 
-  SUBROUTINE Read_F107KP_IPE_Forcing( forcing, filename, data_size, read_in_start, read_in_skip, fill, rc )
+  SUBROUTINE Read_F107KP_IPE_Forcing( &
+       forcing, &
+       filename, &
+       data_size, &
+       read_in_start, &
+       read_in_skip, &
+       fill, &
+       rc )
 
     IMPLICIT NONE
 
@@ -299,6 +353,10 @@ CONTAINS
     INTEGER       :: i, iostat, read_in_size
     CHARACTER(20) :: date_work
 
+    integer :: nPointsActual = 0
+    integer :: year, month, day, hour, minute, second
+    real*4 :: dummy
+    
     rc = IPE_SUCCESS
 
     OPEN( UNIT   = NewUnit(fUnit), &
@@ -307,29 +365,41 @@ CONTAINS
           ACTION = 'READ',         &
           STATUS = 'OLD' ,         &
           IOSTAT = iostat )
-    IF ( ipe_iostatus_check( iostat, msg="Error opening forcing file "//filename, &
-      line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+    IF ( ipe_iostatus_check( iostat, &
+         msg="Error opening forcing file "//filename, &
+         line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
     ! Skip over the header information
     DO i = 1, 5
 
       READ(fUnit, *, IOSTAT = iostat )
-      IF ( ipe_iostatus_check( iostat, msg="Error advancing forcing file "//filename, &
-        line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+      IF ( ipe_iostatus_check( iostat, &
+           msg="Error advancing forcing file "//filename, &
+           line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
     END DO
 
-    DO i = 1, read_in_skip
-
-      READ(fUnit, *, IOSTAT = iostat)
-      IF ( ipe_iostatus_check( iostat, msg="Error advancing forcing file "//filename, &
-        line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
-
-    END DO
+    ! Don't skip any data points:
+    !
+    !DO i = 1, read_in_skip
+    !
+    !  READ(fUnit, *, IOSTAT = iostat)
+    !  IF ( ipe_iostatus_check( iostat, &
+    !       msg="Error advancing forcing file "//filename, &
+    !       line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+    !
+    !END DO
 
     read_in_size = MIN(forcing % n_time_levels, data_size)
-    DO i = read_in_start, read_in_size + read_in_start - 1
-!      write(6,*) "reading",i
+    nPointsActual = 0
+    i = read_in_start
+    if (read_in_start /= 1) then
+       write(*,*) "read_in_start /= 1, which is bad"
+    endif
+!    DO i = read_in_start, read_in_size + read_in_start - 1
+    iostat = 0
+    do while (iostat == 0)
+
       READ(fUnit, *, IOSTAT = iostat) date_work, &
                                      forcing % f107(i), &
                                      forcing % kp(i), &
@@ -346,14 +416,54 @@ CONTAINS
                                      forcing % solarwind_velocity(i), &
                                      forcing % solarwind_Bz(i), &
                                      forcing % solarwind_density(i)
-      IF ( ipe_iostatus_check( iostat, msg="Error reading forcing file "//filename, &
-        line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+      if (forcing % nhemi_power_index(i) < 0) then
+         dummy = forcing % nhemi_power(i)
+         forcing % nhemi_power_index(i) = &
+              2.09*ALOG(dummy)*1.0475
+      endif
+      if (forcing % shemi_power_index(i) < 0) then
+         dummy = forcing % shemi_power(i)
+         forcing % shemi_power_index(i) = &
+              2.09*ALOG(dummy)*1.0475
+      endif
+      if (iostat == 0) then
+         
+         if (i == read_in_start) then
+            ! of course these are in different formats.
+            ! year
+            forcing % initial_timestamp(1:4) = date_work(1:4)
+            ! month
+            forcing % initial_timestamp(5:6) = date_work(6:7)
+            ! day
+            forcing % initial_timestamp(7:8) = date_work(9:10)
+            ! hour
+            forcing % initial_timestamp(9:10) = date_work(12:13)
+            ! minute
+            forcing % initial_timestamp(11:12) = date_work(15:16)
 
+            ! ----------------------------------------- !
+            ! Code will only crash if first line is bad !
+            ! ----------------------------------------- !
+            IF ( ipe_iostatus_check( iostat, &
+                 msg="Error reading forcing file "//filename, &
+                 line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+         endif
+
+         READ(date_work, '(I4,1x,I2,1x,I2,1x,I2,1x,I2,1x,I2)' ) &
+              year, month, day, hour, minute, second
+         forcing % time(i) = hour * 3600.0 + minute * 60.0 + second * 1.0
+         
+         nPointsActual = nPointsActual + 1
+         i = i + 1
+      endif
     END DO
 
+    read_in_size = nPointsActual
+    
     CLOSE(fUnit, IOSTAT = iostat)
-    IF ( ipe_iostatus_check( iostat, msg="Error closing forcing file "//filename, &
-      line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+    IF ( ipe_iostatus_check( iostat, &
+         msg="Error closing forcing file "//filename, &
+         line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
     forcing % max_read_index = read_in_size + read_in_start - 1
     if ( fill ) then
@@ -380,6 +490,8 @@ CONTAINS
 
   SUBROUTINE Read_Tiros_IPE_Forcing( forcing, rc )
 
+    use ModMile
+    
     IMPLICIT NONE
 
     CLASS( IPE_Forcing ), INTENT(inout) :: forcing
@@ -387,11 +499,11 @@ CONTAINS
 
     ! Local
     INTEGER :: fUnit, iBand, irec, iostat
-    CHARACTER(LEN=*), PARAMETER :: ion_filename     = "./ionprof"
-    CHARACTER(LEN=*), PARAMETER :: spectra_filename = "./tiros_spectra"
+    CHARACTER(LEN=*), PARAMETER :: ion_filename = "ionprof"
+    CHARACTER(LEN=*), PARAMETER :: spectra_filename = "tiros_spectra"
 
     OPEN( UNIT = NewUnit(fUnit), &
-          FILE = ion_filename, &
+          FILE = trim(dataDir) // trim(ion_filename), &
           FORM = 'FORMATTED', &
           STATUS = 'OLD', &
           ACTION = 'READ',&
@@ -412,7 +524,7 @@ CONTAINS
       line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
     OPEN( UNIT = NewUnit(fUnit), &
-          FILE = spectra_filename, &
+          FILE = trim(dataDir) // trim(spectra_filename), &
           FORM = 'FORMATTED', &
           STATUS = 'OLD', &
           ACTION = 'READ',&

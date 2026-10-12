@@ -128,6 +128,19 @@ AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
 am__v_lt_0 = --silent
 am__v_lt_1 = 
+PPFCCOMPILE = $(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) \
+	$(AM_CPPFLAGS) $(CPPFLAGS) $(AM_FCFLAGS) $(FCFLAGS)
+AM_V_PPFC = $(am__v_PPFC_@AM_V@)
+am__v_PPFC_ = $(am__v_PPFC_@AM_DEFAULT_V@)
+am__v_PPFC_0 = @echo "  PPFC    " $@;
+am__v_PPFC_1 =
+FCLD = $(FC)
+FCLINK = $(FCLD) $(AM_FCFLAGS) $(FCFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o \
+	$@
+AM_V_FCLD = $(am__v_FCLD_@AM_V@)
+am__v_FCLD_ = $(am__v_FCLD_@AM_DEFAULT_V@)
+am__v_FCLD_0 = @echo "  FCLD    " $@;
+am__v_FCLD_1 =
 F77COMPILE = $(F77) $(AM_FFLAGS) $(FFLAGS)
 AM_V_F77 = $(am__v_F77_@AM_V@)
 am__v_F77_ = $(am__v_F77_@AM_DEFAULT_V@)
@@ -140,6 +153,18 @@ AM_V_F77LD = $(am__v_F77LD_@AM_V@)
 am__v_F77LD_ = $(am__v_F77LD_@AM_DEFAULT_V@)
 am__v_F77LD_0 = @echo "  F77LD   " $@;
 am__v_F77LD_1 = 
+COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
+	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
+AM_V_CC = $(am__v_CC_@AM_V@)
+am__v_CC_ = $(am__v_CC_@AM_DEFAULT_V@)
+am__v_CC_0 = @echo "  CC      " $@;
+am__v_CC_1 =
+CCLD = $(CC)
+LINK = $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
+AM_V_CCLD = $(am__v_CCLD_@AM_V@)
+am__v_CCLD_ = $(am__v_CCLD_@AM_DEFAULT_V@)
+am__v_CCLD_0 = @echo "  CCLD    " $@;
+am__v_CCLD_1 =
 SOURCES = $(libefield_a_SOURCES)
 DIST_SOURCES = $(libefield_a_SOURCES)
 am__can_run_installinfo = \
@@ -283,13 +308,14 @@ top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 noinst_LIBRARIES = libefield.a
-libefield_a_SOURCES = apex_sunloc_empirical.f efield_ipe.f weimer2005_ipe.f
+libefield_a_SOURCES = apex_sunloc_empirical.f efield_ipe.F90 weimer2005_ipe.f
 libefield_a_FFLAGS = $(FC_MODINC) . $(FC_MODINC) ../shared
+libefield_a_FCFLAGS = $(libefield_a_FFLAGS)
 EXTRA_DIST = apex_sunloc.f
 all: all-am
 
 .SUFFIXES:
-.SUFFIXES: .f .o .obj
+.SUFFIXES: .F90 .f .o .obj
 $(srcdir)/Makefile.in: @MAINTAINER_MODE_TRUE@ $(srcdir)/Makefile.am  $(am__configure_deps)
 	@for dep in $?; do \
 	  case '$(am__configure_deps)' in \
@@ -334,6 +360,18 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
+.F90.o:
+	$(AM_V_PPFC)$(PPFCCOMPILE) -c -o $@ $<
+
+.F90.obj:
+	$(AM_V_PPFC)$(PPFCCOMPILE) -c -o $@ `$(CYGPATH_W) '$<'`
+
+libefield_a-efield_ipe.o: efield_ipe.F90
+	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libefield_a_FCFLAGS) $(FCFLAGS) -c -o libefield_a-efield_ipe.o `test -f 'efield_ipe.F90' || echo '$(srcdir)/'`efield_ipe.F90
+
+libefield_a-efield_ipe.obj: efield_ipe.F90
+	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libefield_a_FCFLAGS) $(FCFLAGS) -c -o libefield_a-efield_ipe.obj `if test -f 'efield_ipe.F90'; then $(CYGPATH_W) 'efield_ipe.F90'; else $(CYGPATH_W) '$(srcdir)/efield_ipe.F90'; fi`
+
 .f.o:
 	$(AM_V_F77)$(F77COMPILE) -c -o $@ $<
 
@@ -345,12 +383,6 @@ libefield_a-apex_sunloc_empirical.o: apex_sunloc_empirical.f
 
 libefield_a-apex_sunloc_empirical.obj: apex_sunloc_empirical.f
 	$(AM_V_F77)$(F77) $(libefield_a_FFLAGS) $(FFLAGS) -c -o libefield_a-apex_sunloc_empirical.obj `if test -f 'apex_sunloc_empirical.f'; then $(CYGPATH_W) 'apex_sunloc_empirical.f'; else $(CYGPATH_W) '$(srcdir)/apex_sunloc_empirical.f'; fi`
-
-libefield_a-efield_ipe.o: efield_ipe.f
-	$(AM_V_F77)$(F77) $(libefield_a_FFLAGS) $(FFLAGS) -c -o libefield_a-efield_ipe.o `test -f 'efield_ipe.f' || echo '$(srcdir)/'`efield_ipe.f
-
-libefield_a-efield_ipe.obj: efield_ipe.f
-	$(AM_V_F77)$(F77) $(libefield_a_FFLAGS) $(FFLAGS) -c -o libefield_a-efield_ipe.obj `if test -f 'efield_ipe.f'; then $(CYGPATH_W) 'efield_ipe.f'; else $(CYGPATH_W) '$(srcdir)/efield_ipe.f'; fi`
 
 libefield_a-weimer2005_ipe.o: weimer2005_ipe.f
 	$(AM_V_F77)$(F77) $(libefield_a_FFLAGS) $(FFLAGS) -c -o libefield_a-weimer2005_ipe.o `test -f 'weimer2005_ipe.f' || echo '$(srcdir)/'`weimer2005_ipe.f

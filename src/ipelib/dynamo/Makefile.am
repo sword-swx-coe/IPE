@@ -1,13 +1,14 @@
 noinst_LIBRARIES = libdynamo.a
 
-libdynamo_a_SOURCES = cons_module.f dynamo_module.f heelis_module.f module_ceee.f module_clearcee.f \
-	module_cnm.f module_cnmmod.f module_colath.f module_divide.f module_edges.f module_flwv32.f \
-	module_highlat.f module_htrpex.f module_init_cons.f module_init_heelis.f module_magfield.f \
+libdynamo_a_SOURCES = cons_module.f90 dynamo_module.f90 heelis_module.f90 module_ceee.f module_clearcee.f \
+	module_cnm.f module_cnmmod.f module_colath.f90 module_divide.f module_edges.f module_flwv32.f90 \
+	module_highlat.F90 module_htrpex.f module_init_cons.f90 module_init_heelis.f module_magfield.f \
 	module_potm.f module_rhspde.f module_stencil.f module_stencmd.f \
-	module_stenmd.f module_stenmod.f module_sub_dynamo.f module_sub_heelis.f module_threed.f \
-	module_transf.f module_weimer2005Ipe.f mudcom.f mud.f mudmod.f muh2cr.f params.f  util.f
+	module_stenmd.f module_stenmod.f module_sub_dynamo.f90 module_sub_heelis.f module_threed.f \
+	module_transf.f module_weimer2005Ipe.f90 mudcom.f mud.f mudmod.f muh2cr.f params.f90  util.f
 
 libdynamo_a_FFLAGS = $(FC_MODINC) . $(FC_MODINC) ../shared
+libdynamo_a_FCFLAGS = $(libdynamo_a_FFLAGS)
 
 EXTRA_DIST = apex_sunloc.f module_cal_monthday.f module_check_err.f module_eldyn.f module_nc_close.f \
 	module_nc_create.f module_plas2dyn_fli_array.f module_sub_nclplot1d.f module_sub_nclplot.f \

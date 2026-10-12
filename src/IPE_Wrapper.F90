@@ -155,9 +155,18 @@ CONTAINS
 
     IF( MOD( ipe % time_tracker % elapsed_sec, ipe % parameters % file_output_frequency ) == 0.0_prec )THEN
 
-      CALL ipe % Write( rc=localrc )
+      CALL ipe % WriteStates( rc=localrc )
       IF( localrc /= IPE_SUCCESS ) THEN
         CALL ESMF_LogSetError(ESMF_RC_FILE_WRITE, msg="Error writing IPE output", &
+          line=__LINE__, &
+          file=__FILE__, &
+          rcToReturn=rc)
+        RETURN
+      ENDIF
+
+      CALL ipe % Write2d( rc=localrc )
+      IF( localrc /= IPE_SUCCESS ) THEN
+        CALL ESMF_LogSetError(ESMF_RC_FILE_WRITE, msg="Error writing 2D IPE output", &
           line=__LINE__, &
           file=__FILE__, &
           rcToReturn=rc)
@@ -196,7 +205,7 @@ CONTAINS
       rcToReturn=rc) ) RETURN  ! bail out
 
     CALL ipe % forcing % Update_Current_Index( ipe % parameters, &
-      ipe % time_tracker % elapsed_sec, rc=localrc )
+      ipe % time_tracker, rc=localrc )
     IF( localrc /= IPE_SUCCESS ) THEN
       CALL ESMF_LogSetError(ESMF_RC_INTNRL_BAD, msg="Error updating IPE forcing index", &
         line=__LINE__, &
@@ -205,13 +214,11 @@ CONTAINS
       RETURN
     ENDIF
 
-    CALL ipe % eldyn % Update( ipe % grid, &
+    CALL ipe % eldyn % Update( ipe % parameters, &
+                               ipe % grid, &
                                ipe % forcing, &
                                ipe % time_tracker, &
                                ipe % plasma, &
-                               ipe % parameters % offset1_deg, &
-                               ipe % parameters % offset2_deg, &
-                               ipe % parameters % potential_model, &
                                ipe % mpi_layer, &
                                rc=localrc )
     IF( localrc /= IPE_SUCCESS ) THEN

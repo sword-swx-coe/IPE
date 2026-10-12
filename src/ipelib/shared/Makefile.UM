@@ -1,0 +1,17 @@
+include ${DIRSFILE}
+include ${BUILDDIR}/Makefile.conf
+
+MY_LIB = ${LIBDIR}/libShared.a
+
+MODULES = \
+	ipe_error_module.o\
+	ModMile.o
+
+LIB:
+	@echo '--> Compiling Shared in ${SHAREDDIR} <--'
+	@make --no-print-directory -f Makefile.UM ${MY_LIB}
+
+${MY_LIB}: ${MF} ${MODULES} ${OBJECTS}
+	@echo '--> Creating Shared library <--'
+	@rm -f ${MY_LIB}
+	${AR} ${MY_LIB} ${MODULES} ${OBJECTS}

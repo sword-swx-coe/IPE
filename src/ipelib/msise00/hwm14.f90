@@ -71,7 +71,7 @@ subroutine hwm14(iyd,sec,alt,glat,glon,stl,f107a,f107,ap,path,w,rc)
     real(4),        intent(in)  :: ap(2)
     real(4),        intent(out) :: w(2)
     real(4)                     :: dw(2)
-    character(250), intent(in)  :: path
+    character(200), intent(in)  :: path
     integer,        intent(out) :: rc
 
     integer :: localrc

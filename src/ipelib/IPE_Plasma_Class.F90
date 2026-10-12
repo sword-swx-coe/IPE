@@ -12,11 +12,15 @@ MODULE IPE_Plasma_Class
   USE params_module, ONLY: kmlat, kmlon, kmlonp1
   USE cons_module, ONLY: xlatm_deg
 
+  use ModMile
+
   IMPLICIT NONE
 
   TYPE IPE_Plasma
-    INTEGER :: nFluxTube, NLP, NMP
-    INTEGER :: mp_low, mp_high, mp_halo
+     INTEGER :: nFluxTube, NLP, NMP
+     INTEGER :: mp_low, mp_high, mp_halo
+
+     REAL(prec) :: HPn, HPs, CPCP
 
     REAL(prec), POINTER     :: ion_densities(:,:,:,:)
     REAL(prec), ALLOCATABLE :: ion_velocities(:,:,:,:)
@@ -42,6 +46,8 @@ MODULE IPE_Plasma_Class
     REAL(prec) :: rim_aver(kmlonp1,kmlat)
     REAL(prec) :: rim_diff(kmlonp1,kmlat)
 
+    REAL(prec), ALLOCATABLE :: aurora_eflux2d(:,:)
+    REAL(prec), ALLOCATABLE :: aurora_avee2d(:,:)
 
     CONTAINS
 
@@ -69,12 +75,17 @@ MODULE IPE_Plasma_Class
   REAL(prec), PARAMETER, PRIVATE :: safe_density_minimum = 1.0e+06_prec
   REAL(prec), PARAMETER, PRIVATE :: safe_temperature_minimum = 100.0_prec
 !  REAL(prec), PARAMETER, PRIVATE :: colfac = 1.3_prec
-  REAL(prec), PARAMETER, PRIVATE :: qeoNao10 = 9.6489E7_prec        !  qe/m_e*1000 [C/g]
-  REAL(prec), PARAMETER, PRIVATE :: qeomeo10 = 1.7588028E11_prec    ! qe/m_e*1000 [C/g]
-  REAL(prec), PARAMETER, PRIVATE :: rmassinv_nop = 1.0_prec / NO_mass ! inverted rmass
-  REAL(prec), PARAMETER, PRIVATE :: rmassinv_o1  = 1.0_prec / O_mass  ! inverted rmass
-  REAL(prec), PARAMETER, PRIVATE :: rmassinv_o2  = 1.0_prec / O2_mass ! inverted rmass
+  REAL(prec), PARAMETER, PRIVATE :: qeoNao10 = 9.6489E7_prec ! qe/m_e*1000 [C/g]
+  REAL(prec), PARAMETER, PRIVATE :: qeomeo10 = 1.7588028E11_prec ! qe/m_e*1000 [C/g]
+  ! inverted rmass(es):
+  REAL(prec), PARAMETER, PRIVATE :: rmassinv_nop = 1.0_prec / NO_mass
+  REAL(prec), PARAMETER, PRIVATE :: rmassinv_o1  = 1.0_prec / O_mass
+  REAL(prec), PARAMETER, PRIVATE :: rmassinv_o2  = 1.0_prec / O2_mass
 
+  integer :: nMlts, nLats
+  real, allocatable :: lats2d(:,:), mlts2d(:,:), area2d(:,:)
+  real, allocatable :: eflux2d(:,:), avee2d(:,:)
+  logical :: doCalculateArea = .true.
 
   ! ::::::::::::::::: Cross_Flux_Tube_Transport  PARAMETERs ::::::::::::::::: !
   !
@@ -161,49 +172,84 @@ CONTAINS
     INTEGER,             INTENT(in)  :: mp_low, mp_high, halo
     INTEGER, OPTIONAL,   INTENT(out) :: rc
 
-    INTEGER :: stat
+    INTEGER :: stat, iStart, iEnd
 
     IF ( PRESENT( rc ) ) rc = IPE_SUCCESS
 
-      plasma % nFluxTube = nFluxTube
-      plasma % NLP       = NLP
-      plasma % NMP       = NMP
-      plasma % mp_low    = mp_low
-      plasma % mp_high   = mp_high
-      plasma % mp_halo   = halo
+    plasma % nFluxTube = nFluxTube
+    plasma % NLP       = NLP
+    plasma % NMP       = NMP
+    plasma % mp_low    = mp_low
+    plasma % mp_high   = mp_high
+    plasma % mp_halo   = halo
 
-      ALLOCATE( plasma % ion_densities(1:n_ion_species,1:nFluxTube,1:NLP,mp_low-halo:mp_high+halo), &
-                plasma % ion_velocities(1:n_ion_species,1:nFluxTube,1:NLP,mp_low-halo:mp_high+halo), &
-                plasma % ion_temperature(1:nFluxTube,1:NLP,mp_low-halo:mp_high+halo), &
-                plasma % electron_density(1:nFluxTube,1:NLP,mp_low-halo:mp_high+halo), &
-                plasma % electron_density2(1:nFluxTube,1:NLP,mp_low-halo:mp_high+halo), &
-                plasma % electron_velocity(1:3,1:nFluxTube,1:NLP,mp_low-halo:mp_high+halo), &
-                plasma % electron_temperature(1:nFluxTube,1:NLP,mp_low-halo:mp_high+halo), &
-                plasma % ion_densities_old(1:n_ion_species,1:nFluxTube,1:NLP,mp_low-halo:mp_high+halo), &
-                plasma % ion_velocities_old(1:n_ion_species,1:nFluxTube,1:NLP,mp_low-halo:mp_high+halo), &
-                plasma % ion_temperature_old(1:nFluxTube,1:NLP,mp_low-halo:mp_high+halo), &
-                plasma % electron_density_old(1:nFluxTube,1:NLP,mp_low-halo:mp_high+halo), &
-                plasma % electron_velocity_old(1:3,1:nFluxTube,1:NLP,mp_low-halo:mp_high+halo), &
-                plasma % electron_temperature_old(1:nFluxTube,1:NLP,mp_low-halo:mp_high+halo), &
-                plasma % conductivities(1:6,1:2,1:NLP,1:NMP), &
-                plasma % ionization_rates(1:4,1:nFluxTube,1:NLP,mp_low-halo:mp_high+halo), &
-                stat = stat )
-      IF ( ipe_alloc_check( stat, msg="Failed to allocate plasma internal arrays", &
-        line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+    iStart = mp_low-halo
+    iEnd = mp_high+halo
+    ALLOCATE( &
+         plasma % ion_densities(1:n_ion_species,1:nFluxTube,1:NLP,iStart:iEnd), &
+         plasma % ion_velocities(1:n_ion_species,1:nFluxTube,1:NLP,iStart:iEnd), &
+         plasma % ion_temperature(1:nFluxTube,1:NLP,iStart:iEnd), &
+         plasma % electron_density(1:nFluxTube,1:NLP,iStart:iEnd), &
+         plasma % electron_density2(1:nFluxTube,1:NLP,iStart:iEnd), &
+         plasma % electron_velocity(1:3,1:nFluxTube,1:NLP,iStart:iEnd), &
+         plasma % electron_temperature(1:nFluxTube,1:NLP,iStart:iEnd), &
+         plasma % ion_densities_old(1:n_ion_species,1:nFluxTube,1:NLP,iStart:iEnd), &
+         plasma % ion_velocities_old(1:n_ion_species,1:nFluxTube,1:NLP,iStart:iEnd), &
+         plasma % ion_temperature_old(1:nFluxTube,1:NLP,iStart:iEnd), &
+         plasma % electron_density_old(1:nFluxTube,1:NLP,iStart:iEnd), &
+         plasma % electron_velocity_old(1:3,1:nFluxTube,1:NLP,iStart:iEnd), &
+         plasma % electron_temperature_old(1:nFluxTube,1:NLP,iStart:iEnd), &
+         plasma % conductivities(1:6,1:2,1:NLP,1:NMP), &
+         plasma % ionization_rates(1:4,1:nFluxTube,1:NLP,iStart:iEnd), &
+         stat = stat )
+    IF ( ipe_alloc_check( stat, &
+         msg="Failed to allocate plasma internal arrays", &
+         line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
-      plasma % ion_densities           = safe_density_minimum
-      plasma % ion_velocities          = 0.0_prec
-      plasma % ion_temperature         = safe_temperature_minimum
-      plasma % electron_density        = safe_density_minimum
-      plasma % electron_velocity       = 0.0_prec
-      plasma % electron_temperature    = safe_temperature_minimum
-      plasma % ionization_rates        = 0.0_prec
-      plasma % conductivities          = 0.0_prec
-      plasma % use_rim_aurora          = .FALSE.
+    ALLOCATE( &
+         plasma % aurora_eflux2d(1:NLP,iStart:iEnd), &
+         plasma % aurora_avee2d(1:NLP,iStart:iEnd), &
+         stat = stat )
+    IF ( ipe_alloc_check( stat, &
+         msg="Failed to allocate plasma AURORA arrays", &
+         line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+
+    nMlts = iEnd - iStart + 1
+    nLats = NLP * 2
+
+    allocate(area2d(nMlts, nLats), stat = stat)
+    IF ( ipe_alloc_check( stat, &
+         msg="Failed to allocate plasma area2d array", &
+         line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+
+#ifdef HAVE_MILE
+
+    allocate( &
+         mlts2d(nMlts, nLats), &
+         lats2d(nMlts, nLats), &
+         eflux2d(nMlts, nLats), &
+         avee2d(nMlts, nLats), stat = stat)
+    IF ( ipe_alloc_check( stat, &
+         msg="Failed to allocate plasma MILE arrays", &
+         line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+
+#endif
+
+    plasma % ion_densities           = safe_density_minimum
+    plasma % ion_velocities          = 0.0_prec
+    plasma % ion_temperature         = safe_temperature_minimum
+    plasma % electron_density        = safe_density_minimum
+    plasma % electron_velocity       = 0.0_prec
+    plasma % electron_temperature    = safe_temperature_minimum
+    plasma % ionization_rates        = 0.0_prec
+    plasma % conductivities          = 0.0_prec
+    plasma % use_rim_aurora = .FALSE.
+    plasma % aurora_eflux2d = 0.0_prec
+    plasma % aurora_avee2d = 0.0_prec
 
 #ifdef HAVE_MPI
-      ALLOCATE( ion_requestHandle(1:16))
-      ion_requestHandle = 0
+    ALLOCATE( ion_requestHandle(1:16))
+    ion_requestHandle = 0
 #endif
 
   END SUBROUTINE Build_IPE_Plasma
@@ -216,7 +262,6 @@ CONTAINS
     INTEGER :: stat
 
     IF ( PRESENT( rc ) ) rc = IPE_SUCCESS
-
 
     DEALLOCATE( plasma % ion_densities, &
                 plasma % ion_velocities, &
@@ -239,6 +284,23 @@ CONTAINS
 
     plasma % use_rim_aurora = .FALSE.
 
+    DEALLOCATE( plasma % aurora_eflux2d, &
+                plasma % aurora_avee2d, &
+                stat = stat )
+    IF ( ipe_dealloc_check( stat, msg="Unable to free up plasma - AURORA memory", &
+      line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+
+#ifdef HAVE_MILE
+    deallocate(mlts2d, lats2d, eflux2d, avee2d, stat=stat)
+    IF ( ipe_dealloc_check( stat, msg="Unable to free MILE aurora memory", &
+      line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+#endif
+
+    DEALLOCATE(area2d, stat=stat)
+    IF ( ipe_dealloc_check( stat, msg="Unable to free aurora area memory", &
+      line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+    doCalculateArea = .TRUE.
+
 #ifdef HAVE_MPI
     DEALLOCATE( ion_requestHandle, stat=stat )
     IF ( ipe_dealloc_check( stat, msg="Unable to free up memory", &
@@ -246,45 +308,51 @@ CONTAINS
 #endif
 
   END SUBROUTINE Trash_IPE_Plasma
- 
 
-  SUBROUTINE Update_IPE_Plasma( plasma, grid, neutrals, forcing, time_tracker, mpi_layer, v_ExB, time_step, colfac, hpeq, &
-                                transport_highlat_lp, perp_transport_max_lp, rc )
 
-    CLASS( IPE_Plasma ),   INTENT(inout) :: plasma
-    TYPE( IPE_Grid ),      INTENT(in)    :: grid
-    TYPE( IPE_Neutrals ),  INTENT(in)    :: neutrals
-    TYPE( IPE_Forcing ),   INTENT(in)    :: forcing
-    TYPE( IPE_Time ),      INTENT(in)    :: time_tracker
-    TYPE( IPE_MPI_Layer ), INTENT(in)    :: mpi_layer
-    REAL(prec),            INTENT(in)    :: v_ExB(1:3,1:grid % NLP,grid % mp_low:grid % mp_high)
-    REAL(prec),            INTENT(in)    :: time_step
-    REAL(prec),            INTENT(in)    :: colfac
-    REAL(prec),            INTENT(in)    :: hpeq
-    INTEGER,               INTENT(in)    :: transport_highlat_lp
+  SUBROUTINE Update_IPE_Plasma( &
+       plasma, grid, neutrals, forcing, time_tracker, &
+       mpi_layer, v_ExB, time_step, colfac, hpeq, &
+       transport_highlat_lp, perp_transport_max_lp, rc )
+
+    CLASS( IPE_Plasma ), INTENT(inout) :: plasma
+    TYPE( IPE_Grid ), INTENT(in) :: grid
+    TYPE( IPE_Neutrals ), INTENT(in) :: neutrals
+    TYPE( IPE_Forcing ), INTENT(in) :: forcing
+    TYPE( IPE_Time ), INTENT(in) :: time_tracker
+    TYPE( IPE_MPI_Layer ), INTENT(in) :: mpi_layer
+    REAL(prec), INTENT(in) :: &
+         v_ExB(1:3, 1:grid % NLP, grid % mp_low : grid % mp_high)
+    REAL(prec), INTENT(in) :: time_step
+    REAL(prec), INTENT(in) :: colfac
+    REAL(prec), INTENT(in) :: hpeq
+    INTEGER, INTENT(in) :: transport_highlat_lp
     INTEGER,               INTENT(in)    :: perp_transport_max_lp
     INTEGER, OPTIONAL,     INTENT(out)   :: rc
 
     ! Local
-    INTEGER    :: n_transport_timesteps
-    INTEGER    :: i, lp, mp, j, localrc
-    INTEGER    :: nflag_t(1 : plasma % NLP,plasma % mp_low : plasma % mp_high)
-    INTEGER    :: nflag_d(1 : plasma % NLP,plasma % mp_low : plasma % mp_high)
+    INTEGER :: n_transport_timesteps
+    INTEGER :: i, lp, mp, j, localrc, iMlt, iLat, iMltS
+    INTEGER :: nflag_t(1 : plasma % NLP,plasma % mp_low : plasma % mp_high)
+    INTEGER :: nflag_d(1 : plasma % NLP,plasma % mp_low : plasma % mp_high)
     REAL(prec) :: max_transport_convection_ratio_local
     REAL(prec) :: max_transport_convection_ratio
     REAL(prec) :: transport_time_step2
 #ifdef HAVE_MPI
     INTEGER :: mpiError
 #endif
+    integer :: iS, iE
 
-      IF ( PRESENT( rc ) ) rc = IPE_SUCCESS
+    IF ( PRESENT( rc ) ) rc = IPE_SUCCESS
 
-      CALL plasma % Test_Transport_Time_step( grid, v_ExB, time_step, mpi_layer, &
-                                              max_transport_convection_ratio_local, &
-                                              perp_transport_max_lp )
-!     write(6,7999) time_tracker % utime, mpi_layer % rank_id , grid % mp_low, grid % mp_high, max_transport_convection_ratio_local, &
-!                                          v_ExB(1,5:7,grid % mp_low), v_ExB(2,5:7,grid % mp_high)     
-!7999 format('GHGM convect ratio ', f7.1, 3i4 , f12.1, 6e10.2)
+    ! Initialize output variables to zero
+    plasma % aurora_eflux2d = 0.0
+    plasma % aurora_avee2d = 0.0
+
+    CALL plasma % Test_Transport_Time_step( &
+         grid, v_ExB, time_step, mpi_layer, &
+         max_transport_convection_ratio_local, &
+         perp_transport_max_lp )
 
 #ifdef HAVE_MPI
       CALL MPI_ALLREDUCE( max_transport_convection_ratio_local, &
@@ -294,8 +362,6 @@ CONTAINS
                           MPI_MAX, &
                           mpi_layer % mpi_communicator, &
                           mpiError )
-
-!     write(7000 + mpi_layer % rank_id,*) 'GHGM MAX ', max_transport_convection_ratio
 
       ! sub-stepping for advection
 !     n_transport_timesteps = INT( time_step/transport_time_step )
@@ -318,13 +384,6 @@ CONTAINS
 
       transport_time_step2 = time_step / float(n_transport_timesteps)
 
-!     write(6,1000) mpi_layer % rank_id, time_tracker % utime, &
-!                                                      n_transport_timesteps, &
-!                                                      transport_time_step2
-
-!1000 format('GHGM timestep ', i4,f12.2,i4,f12.4)
-
-
       DO i = 1, n_transport_timesteps
 
 !       write(1000 + mpi_layer % rank_id,*) ' GHGM TRANSPORT LOOP ', i , ' OF ', n_transport_timesteps
@@ -339,24 +398,63 @@ CONTAINS
              mpiError)
 #endif
 
-        CALL plasma % Cross_Flux_Tube_Transport( grid, v_ExB, transport_time_step2, &
-                                                 transport_highlat_lp,perp_transport_max_lp, &
-                                                 mpi_layer, localrc )
-        IF ( ipe_error_check( localrc, msg="call to Cross_Flux_Tube_Transport failed", &
-          line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
+        CALL plasma % Cross_Flux_Tube_Transport( &
+             grid, v_ExB, transport_time_step2, &
+             transport_highlat_lp,perp_transport_max_lp, &
+             mpi_layer, localrc )
+        IF ( ipe_error_check( localrc, &
+             msg="call to Cross_Flux_Tube_Transport failed", &
+             line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 
       ENDDO
+
+#ifdef HAVE_MILE
+
+      if (useMile .and. .not. plasma % use_rim_aurora) then
+         call mile_prepare_aurora_grid(grid, time_tracker)
+         call ieModel_ % get_aurora(eflux2d, avee2d)
+         where (eflux2d < 0.01) eflux2d = 0.0
+
+         ! Save values for output:
+         ! MILE assumes (lon,lat), while IPE uses (lat,lon), so need to rotate the arrays:
+
+         do iLat = 1, grid % nlp
+           do iMlt = grid % mp_low - grid % mp_halo, grid % mp_high + grid % mp_halo
+             iMltS = iMlt - (mpi_layer % mp_low - grid % mp_halo) + 1
+             plasma % aurora_eflux2d(iLat, iMlt) = eflux2d(iMltS, iLat)
+             plasma % aurora_avee2d(iLat, iMlt) = avee2d(iMltS, iLat)
+           enddo
+         enddo
+
+         plasma % HPn = sum( &
+              area2d(:, 1:grid % nlp) * &
+              eflux2d(:, 1:grid % nlp)/1000.0) / 1e9
+         plasma % HPs = sum( &
+              area2d(:, grid % nlp + 1 : nLats) * &
+              eflux2d(:, grid % nlp + 1 : nLats)/1000.0) / 1e9
+         if (iMileVerbose > 1) &
+              write(*,*) " --> MILE: Hemispheric power on IPE grid (N/S) : ", &
+              plasma % HPn, plasma % HPs
+      endif
+
+#endif
 
       CALL plasma % Auroral_Precipitation( grid, &
                                            neutrals, &
                                            forcing, &
-                                           time_tracker )
+                                           time_tracker, &
+                                           mpi_layer )
 
-       if (mpi_layer % rank_id.eq.0) then
-       write(6,899) time_tracker % year, time_tracker % month, time_tracker % day, &       
-                    time_tracker % hour, time_tracker % minute
- 899   format('Calling Plasma         ', i4,x,i2.2,x,i2.2,2x,i2.2,':'i2.2)
-       endif
+      if (mpi_layer % rank_id.eq.0) then
+         write(6,899) &
+              time_tracker % year, &
+              time_tracker % month, &
+              time_tracker % day, &
+              time_tracker % hour, &
+              time_tracker % minute
+899      format('  --> Calling Plasma         ', &
+              i4,x,i2.2,x,i2.2,2x,i2.2,':',i2.2)
+      endif
 
       CALL plasma % FLIP_Wrapper( grid,         &
                                   neutrals,     &
@@ -365,11 +463,91 @@ CONTAINS
                                   time_step, colfac, hpeq, nflag_t,nflag_d )
 
       !TWFANG, calculate field line integrals for dynamo solver
-      CALL plasma % Calculate_Field_Line_Integrals(grid, neutrals, colfac, mpi_layer)
+      CALL plasma % Calculate_Field_Line_Integrals( &
+           grid, &
+           neutrals, &
+           colfac, &
+           mpi_layer)
 
   END SUBROUTINE Update_IPE_Plasma
 
-!
+  ! ----------------------------------------------------------------
+  ! ----------------------------------------------------------------
+
+#ifdef HAVE_MILE
+
+  subroutine mile_prepare_aurora_grid(grid, time_tracker)
+
+    TYPE( IPE_Grid ), INTENT(in) :: grid
+    TYPE( IPE_Time ), INTENT(in) :: time_tracker
+
+    integer :: iS, iE, iLat, iMlt, mp, lp
+    real :: dMlt, dLat, lon
+
+    if (iMileVerbose >= 0) then
+       write(*,*) "-> MILE: Setting grid for aurora"
+    endif
+    ! Set up grid for working with MILE:
+    DO mp = grid % mp_low - grid % mp_halo, grid % mp_high + grid % mp_halo
+       iMlt = mp - (grid % mp_low - grid % mp_halo) + 1
+       DO lp = 1, grid % NLP
+          mlts2d(iMlt, lp) = time_tracker % utime/3600.0_prec + &
+               rtd * grid % longitude(1,lp,mp)/15.0_prec
+          ! This is a bug fix for IPE, maybe???
+          if (grid % longitude(1,lp,mp) == 0) then
+            if (mp > 2) then
+              lon = 2 * grid % longitude(1,lp,mp-1) - grid % longitude(1,lp,mp-2)
+              mlts2d(iMlt, lp) = time_tracker % utime/3600.0_prec + rtd * lon/15.0_prec
+            endif
+            if (mp < 2) then
+              lon = 2 * grid % longitude(1,lp,mp+1) - grid % longitude(1,lp,mp+2)
+              mlts2d(iMlt, lp) = time_tracker % utime/3600.0_prec + rtd * lon/15.0_prec
+            endif
+          endif
+          iLat = lp
+          lats2d(iMlt, iLat) = &
+               rtd * ( half_pi - grid % magnetic_colatitude(1,lp) )
+          iLat = nLats - lp + 1
+          lats2d(iMlt, iLat) = - lats2d(iMlt, lp)
+          mlts2d(iMlt, iLat) = mlts2d(iMlt, lp)
+       enddo
+    enddo
+    call ieModel_ % nMlts(nMlts)
+    call ieModel_ % nLats(nLats)
+    call ieModel_ % grid(mlts2d, lats2d)
+
+    if (doCalculateArea) then
+       if (iMileVerbose >= 0) then
+          write(*,*) "-> MILE: Calculating area for hemispheric power"
+       endif
+       do iMlt = 1, nMlts
+          do iLat = 1, nLats
+             ! Longitudinal differences
+             iS = iMlt - 1
+             iE = iMlt + 1
+             if (iS < 1) iS = 1
+             if (iE > nMlts) iE = nMlts
+             ! Convert from hours to degrees
+             dMlt = &
+                  abs(mlts2d(iE, iLat) - mlts2d(iS, iLat)) / &
+                  (iE - iS) * 180.0/12.0
+             iS = iLat - 1
+             iE = iLat + 1
+             if (iS < 1) iS = 1
+             if (iE > nLats) iE = nLats
+             dLat = abs(lats2d(iMlt, iE) - lats2d(iMlt, iS)) / (iE - iS)
+             ! assume 120 km per degree
+             area2d(iMlt, iLat) = &
+                  (120000.0**2) * dMlt * dLat * cos(lats2d(iMlt, iLat) * dtr)
+          enddo
+       enddo
+       doCalculateArea = .false.
+    endif
+
+  end subroutine mile_prepare_aurora_grid
+
+#endif
+
   SUBROUTINE Clean_Data( plasma, grid )
     CLASS( IPE_Plasma ), INTENT(inout) :: plasma
     TYPE( IPE_Grid ), INTENT(in)       :: grid
@@ -740,7 +918,7 @@ CONTAINS
 
 
   SUBROUTINE Test_Transport_Time_step( plasma, grid, v_ExB, time_step, mpi_layer, &
-                                       max_transport_convection_ratio, perp_transport_max_lp )          
+                                       max_transport_convection_ratio, perp_transport_max_lp )
 
     CLASS( IPE_Plasma ), INTENT(inout) :: plasma
     TYPE( IPE_Grid ), INTENT(in)       :: grid
@@ -771,7 +949,8 @@ CONTAINS
         DO 200 lp = 1, perp_transport_max_lp
 
 
-          transport_convection_ratio(lp,mp) = (abs(v_ExB(1,lp,mp)*time_step/(r*sin( colat_90km(lp)))) * rad_to_deg) / longitude_spacing
+           transport_convection_ratio(lp,mp) = &
+                (abs(v_ExB(1,lp,mp)*time_step/(r*sin( colat_90km(lp)))) * rad_to_deg) / longitude_spacing
 !         write(7000 + mpi_layer % rank_id, *) mp , lp , transport_convection_ratio(lp,mp)
 
  200    CONTINUE
@@ -785,7 +964,7 @@ CONTAINS
 
 
   SUBROUTINE Cross_Flux_Tube_Transport( plasma, grid, v_ExB, time_step, &
-                                        transport_highlat_lp,perp_transport_max_lp, mpi_layer, rc )  
+                                        transport_highlat_lp,perp_transport_max_lp, mpi_layer, rc )
 
     CLASS( IPE_Plasma ),   INTENT(inout) :: plasma
     TYPE( IPE_Grid ),      INTENT(in)    :: grid
@@ -815,7 +994,11 @@ CONTAINS
     REAL(prec) :: ion_temperature_int
     REAL(prec) :: electron_temperature_int
     REAL(prec) :: r, B_int, max_phi, ksi_fac
-    REAL(prec) :: B(1:2,1:2), velocity(1:n_conv_spec,1:2,1:2), density(1:n_conv_spec,1:2,1:2), temperature(1:2,1:2), e_temperature(1:2,1:2)
+    REAL(prec) :: B(1:2,1:2)
+    REAL(prec) :: velocity(1:n_conv_spec,1:2,1:2)
+    REAL(prec) :: density(1:n_conv_spec,1:2,1:2)
+    REAL(prec) :: temperature(1:2,1:2)
+    REAL(prec) :: e_temperature(1:2,1:2)
     REAL(prec) :: coslam, sinim
     REAL(prec) :: z , z_factor
     INTEGER    :: lp_t0(1:2)
@@ -827,69 +1010,70 @@ CONTAINS
     REAL(prec), PARAMETER :: rad_to_deg = 57.295779513
     CHARACTER(len=128) :: errmsg
 
-      rc = IPE_SUCCESS
+    rc = IPE_SUCCESS
 
-      CALL plasma % Calculate_Pole_Values( grid,                       &
-                                           mpi_layer,                  &
-                                           ion_densities_pole_value,   &
-                                           ion_temperature_pole_value, &
-                                           ion_velocities_pole_value,  &
-                                           electron_temperature_pole_value )
-
-
-      colat_90km(1:grid % NLP) = grid % magnetic_colatitude(1,1:grid % NLP)
-      r = earth_radius + 90000.0_prec
-
-      DO 100 mp = plasma % mp_low, plasma % mp_high
-        DO 200 lp = 1, perp_transport_max_lp
-
-          i_convection_too_far_in_lp = .FALSE.
-
-          if (abs(sin( colat_90km(lp) )) > 1.0e-15_prec) then
-             phi_t0   = grid % magnetic_longitude(mp) - v_ExB(1,lp,mp)*time_step/(r*sin( colat_90km(lp) ) )
-          else
-             phi_t0 = grid % magnetic_longitude(mp)
-          endif
-
-          coslam = cos( half_pi - grid % magnetic_colatitude(1,lp) )
-          sinim  = 2.0_prec*sqrt( 1.0_prec - coslam*coslam )/sqrt( 4.0_prec - 3.0_prec*coslam*coslam )
-          if (abs(sinim) > 1.0e-15_prec) then
-             theta_t0 = colat_90km(lp) - v_ExB(2,lp,mp)*time_step/(r*sinim)
-          else
-             theta_t0 = colat_90km(lp)
-          endif
-
-          ! If a Lagrangian trajectory crosses the equator, we clip the colatitude
-          ! so that the point resides at the equator.
-          IF( theta_t0 > colat_90km( grid % NLP ) )THEN ! NLP ==> Equator
-            theta_t0 = colat_90km( grid % NLP )
-          ENDIF
+    CALL plasma % Calculate_Pole_Values( grid,                       &
+                                         mpi_layer,                  &
+                                         ion_densities_pole_value,   &
+                                         ion_temperature_pole_value, &
+                                         ion_velocities_pole_value,  &
+                                         electron_temperature_pole_value )
 
 
+    colat_90km(1:grid % NLP) = grid % magnetic_colatitude(1,1:grid % NLP)
+    r = earth_radius + 90000.0_prec
 
-          ! lp_min is the nearest point to theta_t0 that has a larger colat value
-          lp_min = 0
-          IF( lp == 1 )THEN
-            ! Check poleward
-            IF( theta_t0 < colat_90km(1) )THEN
-              lp_min = 1
-            ELSE
-              lp_min = 2
-            ENDIF
+    DO 100 mp = plasma % mp_low, plasma % mp_high
+      DO 200 lp = 1, perp_transport_max_lp
 
+        i_convection_too_far_in_lp = .FALSE.
+
+        ! Calculate the latitude (theta) and longitude (phi) of the point where
+        ! the plasma came from
+
+        if (abs(sin( colat_90km(lp) )) > 1.0e-15_prec) then
+            phi_t0 = grid % magnetic_longitude(mp) - v_ExB(1,lp,mp)*time_step/(r*sin( colat_90km(lp) ) )
+        else
+            phi_t0 = grid % magnetic_longitude(mp)
+        endif
+
+        coslam = cos( half_pi - grid % magnetic_colatitude(1,lp) )
+        sinim  = 2.0_prec*sqrt( 1.0_prec - coslam*coslam )/sqrt( 4.0_prec - 3.0_prec*coslam*coslam )
+        if (abs(sinim) > 1.0e-15_prec) then
+            theta_t0 = colat_90km(lp) - v_ExB(2,lp,mp)*time_step/(r*sinim)
+        else
+            theta_t0 = colat_90km(lp)
+        endif
+
+        ! If a Lagrangian trajectory crosses the equator, we clip the colatitude
+        ! so that the point resides at the equator.
+        IF (theta_t0 > colat_90km( grid % NLP )) THEN ! NLP ==> Equator
+          theta_t0 = colat_90km( grid % NLP )
+        ENDIF
+
+        ! lp_min is the nearest point to theta_t0 that has a larger colat value
+        lp_min = 0
+        IF( lp == 1 )THEN
+          ! Check poleward
+          IF (theta_t0 < colat_90km(1)) THEN
+            lp_min = 1
           ELSE
-            ! Check poleward
-            IF( theta_t0 <= colat_90km(lp) .AND. theta_t0 >= colat_90km(lp-1) )THEN
-              lp_min = lp
-            ! Check equatorward
-            ELSEIF( theta_t0 <= colat_90km(lp+1) .AND. theta_t0 >= colat_90km(lp) )THEN
-              lp_min = lp+1
-            ENDIF
+            lp_min = 2
           ENDIF
+
+        ELSE
+          ! Check poleward
+          IF( theta_t0 <= colat_90km(lp) .AND. theta_t0 >= colat_90km(lp-1) )THEN
+            lp_min = lp
+          ! Check equatorward
+          ELSEIF( theta_t0 <= colat_90km(lp+1) .AND. theta_t0 >= colat_90km(lp) )THEN
+            lp_min = lp+1
+          ENDIF
+        ENDIF
 
           IF( lp_min == 0 )THEN
 
-            if((lp.ge.3).and.(lp.le.grid % NLP - 2)) then ! Make sure lp is within bounds                   
+            if((lp.ge.3).and.(lp.le.grid % NLP - 2)) then ! Make sure lp is within bounds
 
             ! Check poleward
             IF( theta_t0 <= colat_90km(lp-1) .AND. theta_t0 >= colat_90km(lp-2) )THEN
@@ -905,7 +1089,7 @@ CONTAINS
 
           IF( lp_min == 0 )THEN
 
-            if((lp.ge.4).and.(lp.le.grid % NLP - 3)) then ! Make sure lp is within bounds                   
+            if((lp.ge.4).and.(lp.le.grid % NLP - 3)) then ! Make sure lp is within bounds
 
             IF( theta_t0 <= colat_90km(lp-2) .AND. theta_t0 >= colat_90km(lp-3) )THEN
               lp_min = lp - 2
@@ -920,7 +1104,7 @@ CONTAINS
 
           IF( lp_min == 0 )THEN
 
-            if((lp.ge.5).and.(lp.le.grid % NLP - 4)) then ! Make sure lp is within bounds                   
+            if((lp.ge.5).and.(lp.le.grid % NLP - 4)) then ! Make sure lp is within bounds
 
             IF( theta_t0 <= colat_90km(lp-3) .AND. theta_t0 >= colat_90km(lp-4) )THEN
               lp_min = lp - 3
@@ -937,17 +1121,19 @@ CONTAINS
             i_convection_too_far_in_lp = .TRUE.
             write(errmsg,*) 'GHGM convection too far ', mp , lp
             CALL ipe_warning_log( msg=errmsg, line=__LINE__, file=__FILE__ )
+            write(*,*) '  -> theta_t0(deg), colat (deg), ExB : ', theta_t0*180/3.14, colat_90km(lp)*180/3.14, v_ExB(2,lp,mp)
+
           ENDIF
 
 ! GHGM - check that lp_min is not greater than NLP
-          
+
 !         IF( lp_min.gt. grid % NLP )THEN
 !           write(6,*) 'GHGM LP_MIN is greater than NLP - out of bounds ', mp , lp
 !           lp_min = grid % NLP
 !         ENDIF
 
 ! GHGM - check that lp_min is not greater than NLP
-!         
+!
 !         IF( lp_min.lt. 2 )THEN
 !           write(6,*) 'GHGM LP_MIN is less than 2 - out of bounds ', mp , lp
 !           lp_min = 2
@@ -964,13 +1150,13 @@ CONTAINS
             lp_t0(1) = lp_min-1
             lp_t0(2) = lp_min
           endif
-          
+
           IF( phi_t0 <= grid % magnetic_longitude(mp) .AND. phi_t0 >= grid % magnetic_longitude(mp-1) )THEN
             mp_min = mp
           ELSEIF( phi_t0 <= grid % magnetic_longitude(mp+1) .AND. phi_t0 >= grid % magnetic_longitude(mp) )THEN
             mp_min = mp+1
           ENDIF
-          
+
           mp_t0(1) = mp_min-1
           mp_t0(2) = mp_min
 
@@ -1066,17 +1252,21 @@ CONTAINS
                   B(lpx,mpx) = grid % magnetic_field_strength(isouth,lp_t0(lpx),mp_t0(mpx))*i_comp_weight(1) +&
                                grid % magnetic_field_strength(inorth,lp_t0(lpx),mp_t0(mpx))*i_comp_weight(2)
 
-                  density(1:n_conv_spec,lpx,mpx) = plasma % ion_densities_old(1:n_conv_spec,isouth,lp_t0(lpx),mp_t0(mpx))*i_comp_weight(1) +&
-                                                     plasma % ion_densities_old(1:n_conv_spec,inorth,lp_t0(lpx),mp_t0(mpx))*i_comp_weight(2)
+                  density(1:n_conv_spec,lpx,mpx) = &
+                       plasma % ion_densities_old(1:n_conv_spec,isouth,lp_t0(lpx),mp_t0(mpx))*i_comp_weight(1) +&
+                       plasma % ion_densities_old(1:n_conv_spec,inorth,lp_t0(lpx),mp_t0(mpx))*i_comp_weight(2)
 
-                  velocity(1:n_conv_spec,lpx,mpx) = plasma % ion_velocities_old(1:n_conv_spec,isouth,lp_t0(lpx),mp_t0(mpx))*i_comp_weight(1) +&
-                                                      plasma % ion_velocities_old(1:n_conv_spec,inorth,lp_t0(lpx),mp_t0(mpx))*i_comp_weight(2)
+                  velocity(1:n_conv_spec,lpx,mpx) = &
+                       plasma % ion_velocities_old(1:n_conv_spec,isouth,lp_t0(lpx),mp_t0(mpx))*i_comp_weight(1) +&
+                       plasma % ion_velocities_old(1:n_conv_spec,inorth,lp_t0(lpx),mp_t0(mpx))*i_comp_weight(2)
 
-                  temperature(lpx,mpx) = plasma % ion_temperature_old(isouth,lp_t0(lpx),mp_t0(mpx))*i_comp_weight(1) +&
-                                         plasma % ion_temperature_old(inorth,lp_t0(lpx),mp_t0(mpx))*i_comp_weight(2)
+                  temperature(lpx,mpx) = &
+                       plasma % ion_temperature_old(isouth,lp_t0(lpx),mp_t0(mpx))*i_comp_weight(1) +&
+                       plasma % ion_temperature_old(inorth,lp_t0(lpx),mp_t0(mpx))*i_comp_weight(2)
 
-                  e_temperature(lpx,mpx) = plasma % electron_temperature_old(isouth,lp_t0(lpx),mp_t0(mpx))*i_comp_weight(1) +&
-                                           plasma % electron_temperature_old(inorth,lp_t0(lpx),mp_t0(mpx))*i_comp_weight(2)
+                  e_temperature(lpx,mpx) = &
+                       plasma % electron_temperature_old(isouth,lp_t0(lpx),mp_t0(mpx))*i_comp_weight(1) +&
+                       plasma % electron_temperature_old(inorth,lp_t0(lpx),mp_t0(mpx))*i_comp_weight(2)
 
 
 
@@ -1095,11 +1285,15 @@ CONTAINS
                 DO lpx = 1, 2
                   B_int = B_int + B(lpx,mpx)*lp_comp_weight(lpx)*mp_comp_weight(mpx)
 
-                  ion_densities_int(1:n_conv_spec) = ion_densities_int(1:n_conv_spec) + density(1:n_conv_spec,lpx,mpx)*lp_comp_weight(lpx)*mp_comp_weight(mpx)
-                  ion_velocities_int(1:n_conv_spec) = ion_velocities_int(1:n_conv_spec) + velocity(1:n_conv_spec,lpx,mpx)*lp_comp_weight(lpx)*mp_comp_weight(mpx)
+                  ion_densities_int(1:n_conv_spec) = ion_densities_int(1:n_conv_spec) + &
+                       density(1:n_conv_spec,lpx,mpx)*lp_comp_weight(lpx)*mp_comp_weight(mpx)
+                  ion_velocities_int(1:n_conv_spec) = ion_velocities_int(1:n_conv_spec) + &
+                       velocity(1:n_conv_spec,lpx,mpx)*lp_comp_weight(lpx)*mp_comp_weight(mpx)
 
-                  ion_temperature_int = ion_temperature_int + temperature(lpx,mpx)*lp_comp_weight(lpx)*mp_comp_weight(mpx)
-                  electron_temperature_int = electron_temperature_int + e_temperature(lpx,mpx)*lp_comp_weight(lpx)*mp_comp_weight(mpx)
+                  ion_temperature_int = ion_temperature_int + &
+                       temperature(lpx,mpx)*lp_comp_weight(lpx)*mp_comp_weight(mpx)
+                  electron_temperature_int = electron_temperature_int + &
+                       e_temperature(lpx,mpx)*lp_comp_weight(lpx)*mp_comp_weight(mpx)
                 ENDDO
               ENDDO
 
@@ -1112,14 +1306,20 @@ CONTAINS
               z = grid % altitude(i,lp)/1000.0_prec
               if ((z.lt.200.0).and.(z.gt.100.0)) then
               z_factor = (z - 100.0) / 100.0
-              ion_densities_int(1:n_conv_spec) = (z_factor * (ion_densities_int(1:n_conv_spec) - plasma % ion_densities_old(1:n_conv_spec,i,lp,mp))) &
-                                               + plasma % ion_densities_old(1:n_conv_spec,i,lp,mp)
-              ion_velocities_int(1:n_conv_spec) = (z_factor * (ion_velocities_int(1:n_conv_spec) - plasma % ion_velocities_old(1:n_conv_spec,i,lp,mp))) &
-                                               + plasma % ion_velocities_old(1:n_conv_spec,i,lp,mp)
-              ion_temperature_int = (z_factor * (ion_temperature_int - plasma % ion_temperature_old(i,lp,mp))) &
-                                               + plasma % ion_temperature_old(i,lp,mp)
-              electron_temperature_int = (z_factor * (electron_temperature_int - plasma % electron_temperature_old(i,lp,mp))) &
-                                               + plasma % electron_temperature_old(i,lp,mp)
+              ion_densities_int(1:n_conv_spec) = &
+                   (z_factor * (ion_densities_int(1:n_conv_spec) - &
+                   plasma % ion_densities_old(1:n_conv_spec,i,lp,mp))) &
+                   + plasma % ion_densities_old(1:n_conv_spec,i,lp,mp)
+              ion_velocities_int(1:n_conv_spec) = &
+                   (z_factor * (ion_velocities_int(1:n_conv_spec) - &
+                   plasma % ion_velocities_old(1:n_conv_spec,i,lp,mp))) &
+                   + plasma % ion_velocities_old(1:n_conv_spec,i,lp,mp)
+              ion_temperature_int = &
+                   (z_factor * (ion_temperature_int - plasma % ion_temperature_old(i,lp,mp))) &
+                   + plasma % ion_temperature_old(i,lp,mp)
+              electron_temperature_int = &
+                   (z_factor * (electron_temperature_int - plasma % electron_temperature_old(i,lp,mp))) &
+                   + plasma % electron_temperature_old(i,lp,mp)
               endif
               if (z.lt.100.0) then
                  ion_densities_int(1:n_conv_spec) = plasma % ion_densities_old(1:n_conv_spec,i,lp,mp)
@@ -1145,7 +1345,9 @@ CONTAINS
   END SUBROUTINE Cross_Flux_Tube_Transport
 
 
-  SUBROUTINE Auroral_Precipitation( plasma, grid, neutrals, forcing, time_tracker )
+  SUBROUTINE Auroral_Precipitation( &
+       plasma, grid, neutrals, forcing, time_tracker, &
+       mpi_layer)
   ! Previously : tiros_ionize_ipe
 
     CLASS( IPE_Plasma ), INTENT(inout) :: plasma
@@ -1153,10 +1355,11 @@ CONTAINS
     TYPE( IPE_Neutrals ), INTENT(in)   :: neutrals
     TYPE( IPE_Forcing ), INTENT(in)    :: forcing
     TYPE( IPE_Time ), INTENT(in)       :: time_tracker
+    TYPE( IPE_MPI_Layer ), INTENT(in)   :: mpi_layer
     ! Local
     INTEGER, PARAMETER :: jmaxwell = 6
     INTEGER    :: i, lp, mp, m, j, iband, l
-    INTEGER    :: i1, i2, j1, j2, k, kk, kNorth, kkNorth, kSouth, kkSouth
+    INTEGER    :: i1, i2, j1, j2, k, kk, kNorth, kkNorth, kSouth, kkSouth, n
     INTEGER    :: iLonRim
     INTEGER    :: tiros_activity_level
     REAL(prec) :: ratio(1:21)
@@ -1178,52 +1381,103 @@ CONTAINS
 
     REAL(prec), PARAMETER :: fc = 1.6e-06_prec
 
-       en(1:15) = (/ 0.37_prec, 0.6_prec, 0.92_prec, 1.37_prec, 2.01_prec, &
-                     2.91_prec, 4.19_prec, 6.0_prec, 8.56_prec, 12.18_prec, &
-                     17.3_prec, 24.49_prec, 36.66_prec, 54.77_prec, 81.82_prec /)
+    integer :: iMlt, iLatS, kkS, kS, iLatN, iError
+    real(prec) :: chS, ratio_chS, efluxS, chiS, diffS
+    real(prec) :: dMLT, dLat, localVar
 
-       width(1:15) = (/ 0.158_prec, 0.315_prec, 0.315_prec, 0.63_prec, 0.631_prec, &
-                        1.261_prec, 1.26_prec, 2.522_prec, 2.522_prec, 5.043_prec, &
-                        5.043_prec, 10.0_prec, 14.81_prec, 22.13_prec, 33.06_prec /)
+    en(1:15) = (/ &
+         0.37_prec, 0.6_prec, 0.92_prec, 1.37_prec, 2.01_prec, &
+         2.91_prec, 4.19_prec, 6.0_prec, 8.56_prec, 12.18_prec, &
+         17.3_prec, 24.49_prec, 36.66_prec, 54.77_prec, 81.82_prec /)
 
-       rlam(1:21) = (/ 1.49_prec, 1.52_prec, 1.51_prec, 1.48_prec, 1.43_prec, &
-                                  1.37_prec, 1.30_prec, 1.22_prec, 1.12_prec, 1.01_prec, &
-                                  0.895_prec, 0.785_prec, 0.650_prec, 0.540_prec, 0.415_prec, &
-                                  0.320_prec, 0.225_prec, 0.14_prec, 0.08_prec, 0.04_prec, 0.0_prec /)
+    width(1:15) = (/ &
+         0.158_prec, 0.315_prec, 0.315_prec, 0.63_prec, 0.631_prec, &
+         1.261_prec, 1.26_prec, 2.522_prec, 2.522_prec, 5.043_prec, &
+         5.043_prec, 10.0_prec, 14.81_prec, 22.13_prec, 33.06_prec /)
 
-      ionchr(1:21) = (/ 0.378_prec, 0.458_prec, 0.616_prec, 0.773_prec, 0.913_prec, &
-                                     1.088_prec, 1.403_prec, 1.718_prec, 2.033_prec, 2.349_prec, &
-                                     2.979_prec, 3.610_prec, 4.250_prec, 4.780_prec, 6.130_prec, &
-                                     7.392_prec, 8.653_prec, 9.914_prec, 12.436_prec, 14.957_prec, 17.479_prec /)
+    rlam(1:21) = (/ &
+         1.49_prec, 1.52_prec, 1.51_prec, 1.48_prec, 1.43_prec, &
+         1.37_prec, 1.30_prec, 1.22_prec, 1.12_prec, 1.01_prec, &
+         0.895_prec, 0.785_prec, 0.650_prec, 0.540_prec, 0.415_prec, &
+         0.320_prec, 0.225_prec, 0.14_prec, 0.08_prec, 0.04_prec, &
+         0.0_prec /)
 
-      rimLat = REAL(xlatm_deg, prec)
-      tiros_activity_level = forcing % nhemi_power_index( forcing % current_index )
-      GW                   = forcing % nhemi_power( forcing % current_index )
+    ionchr(1:21) = (/ &
+         0.378_prec, 0.458_prec, 0.616_prec, 0.773_prec, 0.913_prec, &
+         1.088_prec, 1.403_prec, 1.718_prec, 2.033_prec, 2.349_prec, &
+         2.979_prec, 3.610_prec, 4.250_prec, 4.780_prec, 6.130_prec, &
+         7.392_prec, 8.653_prec, 9.914_prec, 12.436_prec, 14.957_prec, &
+         17.479_prec /)
+    rimLat = REAL(xlatm_deg, prec)
 
-      DO m = 1, 21
-        ratio(m) = REAL( (m-1), prec )*0.05_prec
-      ENDDO
+    tiros_activity_level = &
+         forcing % nhemi_power_index( forcing % current_index )
+    GW = forcing % nhemi_power( forcing % current_index )
 
-      DO iband=1,21
+    DO m = 1, 21
+       ratio(m) = REAL( (m-1), prec )*0.05_prec
+    ENDDO
 
-        te15(iband)=0.0_prec
-        te11(iband)=0.0_prec
+    DO iband=1,21
 
-        DO m = 1, 15
+       te15(iband)=0.0_prec
+       te11(iband)=0.0_prec
+
+       DO m = 1, 15
           te15(iband) = te15(iband) + fc * forcing % djspectra(m,iband)*en(m)*width(m)
-        ENDDO
-        DO m = 1,11
+       ENDDO
+       DO m = 1,11
           te11(iband) = te15(iband) + fc * forcing % djspectra(m,iband)*en(m)*width(m)
-        ENDDO
+       ENDDO
 
-      ENDDO
+    ENDDO
 
-      DO j = 1, jmaxwell
-        en_maxwell(j) = REAL( j, prec )*0.05_prec - 0.025_prec
-      ENDDO
+    DO j = 1, jmaxwell
+       en_maxwell(j) = REAL( j, prec )*0.05_prec - 0.025_prec
+    ENDDO
 
-      DO mp = plasma % mp_low, plasma % mp_high
-        DO lp = 1, grid % NLP
+    !--------------------------------------------------------------------------
+    ! Add MILE auroral precipitation here
+    ! mp is longitudes / MLTs
+    ! lp is latitudes
+    ! Basically just need an array of e-Flux and characteristic energies
+    ! and can use them here in real variables (not arrays):
+    !   - eflux
+    !   - ch
+    !--------------------------------------------------------------------------
+
+    nMlts = plasma % mp_high - plasma % mp_low + 1
+    nLats = (grid % NLP) * 2
+
+    ! Here we assume a uniform longitude:
+    dMlt = rtd * (grid % magnetic_longitude(plasma % mp_low + 1) - &
+         grid % magnetic_longitude(plasma % mp_low))
+
+    area2d = 0.0
+    DO lp = 1, grid % NLP - 1
+       iLatN = lp
+       iLatS = nLats - iLatN + 1
+       DO mp = plasma % mp_low, plasma % mp_high
+          ! We include the halo, so make sure to offset by that!
+          iMlt = mp - plasma % mp_low + 1 + grid % mp_halo
+          dLat = rtd * (grid % magnetic_colatitude(1, lp+1) - &
+               grid % magnetic_colatitude(1, lp))
+          area2d(iMlt, iLatN) = &
+               120000.0 * 120000.0 * &
+               dMlt * dLat * sin(grid % magnetic_colatitude(1, lp))
+          area2d(iMlt, iLatS) = area2d(iMlt, iLatN)
+       enddo
+    enddo
+
+    plasma % HPn = 0.0
+    plasma % HPs = 0.0
+
+    DO mp = plasma % mp_low, plasma % mp_high
+       ! We include the halo, so make sure to offset by that!
+       iMlt = mp - plasma % mp_low + 1 + grid % mp_halo
+       DO lp = 1, grid % NLP
+          iLatN = lp
+          iLatS = nLats - lp + 1
 
           DO i=1,grid % flux_tube_max(lp)
             plasma % ionization_rates(1,i,lp,mp) = 0.0_prec
@@ -1241,7 +1495,7 @@ CONTAINS
           IF ( abs(thmagd) > 50.0_prec )  THEN
 
             mlt = time_tracker % utime/3600.0_prec + &
-                  rtd * grid % longitude(1,lp,mp)/15.0_prec
+                 rtd * grid % longitude(1,lp,mp)/15.0_prec
 
             essa = (mlt + 12.0_prec)*15.0_prec
 
@@ -1280,16 +1534,101 @@ CONTAINS
             rj = rj - j1
             j2 = j1 + 1
 
-            eflux = rj*ri*forcing % emaps(j2,i2,l) + &
+            if ((forcing % emaps(j2,i2,l) > 0.0) .and. &
+                 (forcing % emaps(j2,i1,l) > 0.0) .and. &
+                 (forcing % emaps(j1,i2,l) > 0.0) .and. &
+                 (forcing % emaps(j1,i1,l) > 0.0)) then
+
+               eflux = rj*ri*forcing % emaps(j2,i2,l) + &
                     (1.0_prec-rj)*ri*forcing % emaps(j1,i2,l) + &
                     rj*(1.0_prec-ri)*forcing % emaps(j2,i1,l) + &
                     (1.0_prec-rj)*(1.0_prec-ri)*forcing % emaps(j1,i1,l)
+            else
+               ! Average whatever non-negative values there are:
+               eflux = 0.0
+               n = 0
+               if (forcing % emaps(j2,i2,l) > 0.0) then
+                  eflux = eflux + forcing % emaps(j2,i2,l)
+                  n = n + 1
+               endif
+               if (forcing % emaps(j2,i1,l) > 0.0) then
+                  eflux = eflux + forcing % emaps(j2,i1,l)
+                  n = n + 1
+               endif
+               if (forcing % emaps(j1,i2,l) > 0.0) then
+                  eflux = eflux + forcing % emaps(j1,i2,l)
+                  n = n + 1
+               endif
+               if (forcing % emaps(j1,i1,l) > 0.0) then
+                  eflux = eflux + forcing % emaps(j1,i1,l)
+                  n = n + 1
+               endif
+               if (n > 0) then
+                  eflux = eflux / n
+               else
+                  ! Just take a guess at what the eflux should be:
+                  eflux = 0.1
+               endif
+
+            endif
             eflux = 10.0_prec**(eflux)/1000.0_prec
 
-            ch = rj*ri*forcing % cmaps(j2,i2,l) + &
-                 (1.0_prec-rj)*ri*forcing % cmaps(j1,i2,l) + &
-                 rj*(1.0_prec-ri)*forcing % cmaps(j2,i1,l) + &
-                 (1.0_prec-rj)*(1.0_prec-ri)*forcing % cmaps(j1,i1,l)
+
+            if ((forcing % cmaps(j2,i2,l) > 0.0) .and. &
+                 (forcing % cmaps(j2,i1,l) > 0.0) .and. &
+                 (forcing % cmaps(j1,i2,l) > 0.0) .and. &
+                 (forcing % cmaps(j1,i1,l) > 0.0)) then
+               ch = rj*ri*forcing % cmaps(j2,i2,l) + &
+                    (1.0_prec-rj)*ri*forcing % cmaps(j1,i2,l) + &
+                    rj*(1.0_prec-ri)*forcing % cmaps(j2,i1,l) + &
+                    (1.0_prec-rj)*(1.0_prec-ri)*forcing % cmaps(j1,i1,l)
+            else
+               ! Average whatever non-negative values there are:
+               ch = 0.0
+               n = 0
+               if (forcing % cmaps(j2,i2,l) > 0.0) then
+                  ch = ch + forcing % cmaps(j2,i2,l)
+                  n = n + 1
+               endif
+               if (forcing % cmaps(j2,i1,l) > 0.0) then
+                  ch = ch + forcing % cmaps(j2,i1,l)
+                  n = n + 1
+               endif
+               if (forcing % cmaps(j1,i2,l) > 0.0) then
+                  ch = ch + forcing % cmaps(j1,i2,l)
+                  n = n + 1
+               endif
+               if (forcing % cmaps(j1,i1,l) > 0.0) then
+                  ch = ch + forcing % cmaps(j1,i1,l)
+                  n = n + 1
+               endif
+               if (n > 0) then
+                  ch = ch / n
+               else
+                  ! Just take a guess at what a characteristic energy should be:
+                  ch = 1.5
+               endif
+            endif
+            !write(*,*) 'Getting aurora for (lat/mlt): ', thmagd, mlt, eflux, ch
+            !write(*,*) 'ch : ', &
+            !     forcing % emaps(j2,i2,l), &
+            !     forcing % emaps(j2,i1,l), &
+            !     forcing % emaps(j1,i2,l), &
+            !     forcing % emaps(j1,i1,l)
+
+            IF ( ch < 0.378_prec ) THEN
+               ch = 0.379_prec
+            ENDIF
+
+#ifdef HAVE_MILE
+            if (useMile .and. .not. plasma % use_rim_aurora) then
+               ! Just overwrite these for now.  Need south values too.
+               eflux = eflux2d(iMlt, lp)
+               ch = avee2d(iMlt, lp) / 2
+            endif
+#endif
+            plasma % aurora_eflux2d(lp, mp) = eflux
+            plasma % aurora_avee2d(lp, mp) = ch * 2
 
             IF (plasma % use_rim_aurora) THEN
               ! Flux-tube index mp starts at 0 degrees, while the imported RIM
@@ -1302,6 +1641,8 @@ CONTAINS
                    iLonRim, latNorth, latSouth, efluxNorth, efluxSouth, chNorth, chSouth)
               dfacNorth = 1.0_prec
               dfacSouth = 1.0_prec
+              plasma % aurora_eflux2d(lp, mp) = efluxNorth
+              plasma % aurora_avee2d(lp, mp) = 2.0_prec * chNorth
 
               ! Use the original TIROS spectrum lookup for each RIM footpoint.
               ! ionchr contains the 21 characteristic energies for which IPE
@@ -1375,7 +1716,44 @@ CONTAINS
               ratio_ch = chi/diff
             END IF
 
-            DO i = 1 , grid % flux_tube_max(lp)
+#ifdef HAVE_MILE
+            if (useMile .and. .not. plasma % use_rim_aurora) then
+               efluxS = eflux2d(iMlt, iLatS)
+               chS = avee2d(iMlt, iLatS) / 2
+               ! Calculate ratio and indices for south also:
+               DO kkS = 2 , 21
+                  IF ( chS <= ionchr(kkS) ) THEN
+                     kS = kkS - 1
+                     EXIT
+                  ENDIF
+               ENDDO
+
+               kkS = kS+1
+               chiS = chS - ionchr(kS)
+               diffS = ionchr(kkS) - ionchr(kS)
+               ratio_chS = chiS/diffS
+
+            endif
+#endif
+
+            ! Accumulate power from the selected precipitation source.
+            IF (plasma % use_rim_aurora) THEN
+              plasma % HPn = plasma % HPn + efluxNorth * area2d(iMlt, iLatN)
+              plasma % HPs = plasma % HPs + efluxSouth * area2d(iMlt, iLatS)
+            ELSE
+              plasma % HPn = plasma % HPn + eflux * area2d(iMlt, iLatN)
+#ifdef HAVE_MILE
+              IF (useMile) THEN
+                plasma % HPs = plasma % HPs + efluxS * area2d(iMlt, iLatS)
+              ELSE
+#endif
+                plasma % HPs = plasma % HPs + eflux * area2d(iMlt, iLatS)
+#ifdef HAVE_MILE
+              END IF
+#endif
+            END IF
+
+            DO i = 1, grid % flux_tube_max(lp)
 
               IF ( grid % altitude(i,lp) <= 1.0e+06_prec )THEN
 
@@ -1399,6 +1777,19 @@ CONTAINS
                   END IF
                 END IF
 
+#ifdef HAVE_MILE
+                 if (useMile .and. .not. plasma % use_rim_aurora) then
+                    ! We can have north and south aurora, so overwrite if
+                    ! we are in the southern hemisphere:
+                    if (i > grid % flux_tube_max(lp) / 2) then
+                       ch = chS
+                       eflux = efluxS
+                       k = kS
+                       kk = kkS
+                       ratio_ch = ratio_chS
+                    endif
+                 endif
+#endif
                 grav(i) = -grid % grx(i,lp,mp)
 
                 ntot(i) = ( neutrals % oxygen(i,lp,mp)  +&
@@ -1492,11 +1883,37 @@ CONTAINS
 
               ENDIF
 
-            ENDDO
+           ENDDO
           ENDIF
 
-        ENDDO
-      ENDDO
+       ENDDO
+    ENDDO
+
+#ifdef HAVE_MPI
+    localVar = plasma % HPn/1e9/1e3
+    CALL MPI_ALLREDUCE( &
+         localVar, &
+         plasma % HPn, &
+         1, &
+         mpi_layer % mpi_prec, &
+         MPI_SUM, &
+         mpi_layer % mpi_communicator, &
+         iError )
+    localVar = plasma % HPs/1e9/1e3
+    CALL MPI_ALLREDUCE( &
+         localVar, &
+         plasma % HPs, &
+         1, &
+         mpi_layer % mpi_prec, &
+         MPI_SUM, &
+         mpi_layer % mpi_communicator, &
+         iError )
+#endif
+#ifdef HAVE_MPI
+    if (mpi_layer % rank_id.eq.0) then
+       write(*,*) ' --> HP N/S : ', plasma % HPn, plasma % HPs
+    endif
+#endif
 
   END SUBROUTINE Auroral_Precipitation
 
@@ -1673,7 +2090,8 @@ CONTAINS
 
           IF ( CTIP_CHECK_EFLAG( ERRMSG, EFLAG ) ) THEN
             write(mp_lp_string,"(2i4)") mp,lp
-            CALL ipe_warning_log( msg=trim(ERRMSG)//trim(mp_lp_string), line=__LINE__, file=__FILE__ )
+            CALL ipe_warning_log( msg = trim(ERRMSG)//" -> iMlt(mp) iLat(lp) = "//trim(mp_lp_string), &
+              line=__LINE__, file=__FILE__ )
           ENDIF
 
           DO i=1, grid % flux_tube_max(lp)
@@ -1681,9 +2099,18 @@ CONTAINS
             ! Ion Densities
             plasma % ion_densities(1:9,i,lp,mp) = XIONNX(1:9,i)
             ! Electron Density
-!           plasma % electron_density(i,lp,mp) = XIONNX(1,i) + XIONNX(2,i) + XIONNX(3,i) + XIONNX(4,i) + XIONNX(5,i) + XIONNX(6,i) + XIONNX(7,i) + XIONNX(8,i) + XIONNX(9,i)
-! Just make electron density be Oplus + Hplus for now
-            plasma % electron_density(i,lp,mp) = XIONNX(1,i) + XIONNX(2,i)
+            plasma % electron_density(i,lp,mp) = &
+                 XIONNX(1,i) + &
+                 XIONNX(2,i) + &
+                 XIONNX(3,i) + &
+                 XIONNX(4,i) + &
+                 XIONNX(5,i) + &
+                 XIONNX(6,i) + &
+                 XIONNX(7,i) + &
+                 XIONNX(8,i) + &
+                 XIONNX(9,i)
+            ! Just make electron density be Oplus + Hplus for now
+            ! plasma % electron_density(i,lp,mp) = XIONNX(1,i) + XIONNX(2,i)
             ! Along Flux Tube Ion Velocities
             plasma % ion_velocities(1:9,i,lp,mp) = XIONVX(1:9,i)
 
@@ -1867,7 +2294,10 @@ CONTAINS
 
 !! get pedersen & hall conductivities
 !! more ion spieces can be added for calculating electron density
-               electron_density = plasma % ion_densities(1,i,lp,mp) + plasma % ion_densities(5,i,lp,mp) + plasma % ion_densities(6,i,lp,mp)
+              electron_density = &
+                   plasma % ion_densities(1,i,lp,mp) + &
+                   plasma % ion_densities(5,i,lp,mp) + &
+                   plasma % ion_densities(6,i,lp,mp)
 !              electron_density = plasma % ion_densities(1,i,lp,mp) + plasma % ion_densities(5,i,lp,mp) + plasma % ion_densities(6,i,lp,mp)+ &
 !                                 plasma % ion_densities(2,i,lp,mp) + plasma % ion_densities(3,i,lp,mp) + plasma % ion_densities(4,i,lp,mp)+ &
 !                                 plasma % ion_densities(7,i,lp,mp)
@@ -1983,7 +2413,7 @@ CONTAINS
 
    DO mp = grid % mp_low , grid % mp_high
      DO lp = 1, grid % NLP
-        DO ihem = 1, 2 
+        DO ihem = 1, 2
            conductivities(1:6,ihem,lp,mp) = plasma % conductivities(1:6,ihem,lp,mp)
         ENDDO
      ENDDO

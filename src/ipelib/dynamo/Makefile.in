@@ -155,6 +155,19 @@ AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
 am__v_lt_0 = --silent
 am__v_lt_1 = 
+PPFCCOMPILE = $(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) \
+	$(AM_CPPFLAGS) $(CPPFLAGS) $(AM_FCFLAGS) $(FCFLAGS)
+AM_V_PPFC = $(am__v_PPFC_@AM_V@)
+am__v_PPFC_ = $(am__v_PPFC_@AM_DEFAULT_V@)
+am__v_PPFC_0 = @echo "  PPFC    " $@;
+am__v_PPFC_1 =
+FCLD = $(FC)
+FCLINK = $(FCLD) $(AM_FCFLAGS) $(FCFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o \
+	$@
+AM_V_FCLD = $(am__v_FCLD_@AM_V@)
+am__v_FCLD_ = $(am__v_FCLD_@AM_DEFAULT_V@)
+am__v_FCLD_0 = @echo "  FCLD    " $@;
+am__v_FCLD_1 =
 F77COMPILE = $(F77) $(AM_FFLAGS) $(FFLAGS)
 AM_V_F77 = $(am__v_F77_@AM_V@)
 am__v_F77_ = $(am__v_F77_@AM_DEFAULT_V@)
@@ -167,6 +180,23 @@ AM_V_F77LD = $(am__v_F77LD_@AM_V@)
 am__v_F77LD_ = $(am__v_F77LD_@AM_DEFAULT_V@)
 am__v_F77LD_0 = @echo "  F77LD   " $@;
 am__v_F77LD_1 = 
+FCCOMPILE = $(FC) $(AM_FCFLAGS) $(FCFLAGS)
+AM_V_FC = $(am__v_FC_@AM_V@)
+am__v_FC_ = $(am__v_FC_@AM_DEFAULT_V@)
+am__v_FC_0 = @echo "  FC      " $@;
+am__v_FC_1 =
+COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
+	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
+AM_V_CC = $(am__v_CC_@AM_V@)
+am__v_CC_ = $(am__v_CC_@AM_DEFAULT_V@)
+am__v_CC_0 = @echo "  CC      " $@;
+am__v_CC_1 =
+CCLD = $(CC)
+LINK = $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
+AM_V_CCLD = $(am__v_CCLD_@AM_V@)
+am__v_CCLD_ = $(am__v_CCLD_@AM_DEFAULT_V@)
+am__v_CCLD_0 = @echo "  CCLD    " $@;
+am__v_CCLD_1 =
 SOURCES = $(libdynamo_a_SOURCES)
 DIST_SOURCES = $(libdynamo_a_SOURCES)
 am__can_run_installinfo = \
@@ -310,14 +340,15 @@ top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 noinst_LIBRARIES = libdynamo.a
-libdynamo_a_SOURCES = cons_module.f dynamo_module.f heelis_module.f module_ceee.f module_clearcee.f \
-	module_cnm.f module_cnmmod.f module_colath.f module_divide.f module_edges.f module_flwv32.f \
-	module_highlat.f module_htrpex.f module_init_cons.f module_init_heelis.f module_magfield.f \
+libdynamo_a_SOURCES = cons_module.f90 dynamo_module.f90 heelis_module.f90 module_ceee.f module_clearcee.f \
+	module_cnm.f module_cnmmod.f module_colath.f90 module_divide.f module_edges.f module_flwv32.f90 \
+	module_highlat.F90 module_htrpex.f module_init_cons.f90 module_init_heelis.f module_magfield.f \
 	module_potm.f module_rhspde.f module_stencil.f module_stencmd.f \
-	module_stenmd.f module_stenmod.f module_sub_dynamo.f module_sub_heelis.f module_threed.f \
-	module_transf.f module_weimer2005Ipe.f mudcom.f mud.f mudmod.f muh2cr.f params.f  util.f
+	module_stenmd.f module_stenmod.f module_sub_dynamo.f90 module_sub_heelis.f module_threed.f \
+	module_transf.f module_weimer2005Ipe.f90 mudcom.f mud.f mudmod.f muh2cr.f params.f90  util.f
 
 libdynamo_a_FFLAGS = $(FC_MODINC) . $(FC_MODINC) ../shared
+libdynamo_a_FCFLAGS = $(libdynamo_a_FFLAGS)
 EXTRA_DIST = apex_sunloc.f module_cal_monthday.f module_check_err.f module_eldyn.f module_nc_close.f \
 	module_nc_create.f module_plas2dyn_fli_array.f module_sub_nclplot1d.f module_sub_nclplot.f \
 	module_update_fli.f nc_module.f
@@ -325,7 +356,7 @@ EXTRA_DIST = apex_sunloc.f module_cal_monthday.f module_check_err.f module_eldyn
 all: all-am
 
 .SUFFIXES:
-.SUFFIXES: .f .o .obj
+.SUFFIXES: .F90 .f .f90 .o .obj
 $(srcdir)/Makefile.in: @MAINTAINER_MODE_TRUE@ $(srcdir)/Makefile.am  $(am__configure_deps)
 	@for dep in $?; do \
 	  case '$(am__configure_deps)' in \
@@ -370,29 +401,23 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
+.F90.o:
+	$(AM_V_PPFC)$(PPFCCOMPILE) -c -o $@ $<
+
+.F90.obj:
+	$(AM_V_PPFC)$(PPFCCOMPILE) -c -o $@ `$(CYGPATH_W) '$<'`
+
+libdynamo_a-module_highlat.o: module_highlat.F90
+	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libdynamo_a_FCFLAGS) $(FCFLAGS) -c -o libdynamo_a-module_highlat.o `test -f 'module_highlat.F90' || echo '$(srcdir)/'`module_highlat.F90
+
+libdynamo_a-module_highlat.obj: module_highlat.F90
+	$(AM_V_PPFC)$(FC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libdynamo_a_FCFLAGS) $(FCFLAGS) -c -o libdynamo_a-module_highlat.obj `if test -f 'module_highlat.F90'; then $(CYGPATH_W) 'module_highlat.F90'; else $(CYGPATH_W) '$(srcdir)/module_highlat.F90'; fi`
+
 .f.o:
 	$(AM_V_F77)$(F77COMPILE) -c -o $@ $<
 
 .f.obj:
 	$(AM_V_F77)$(F77COMPILE) -c -o $@ `$(CYGPATH_W) '$<'`
-
-libdynamo_a-cons_module.o: cons_module.f
-	$(AM_V_F77)$(F77) $(libdynamo_a_FFLAGS) $(FFLAGS) -c -o libdynamo_a-cons_module.o `test -f 'cons_module.f' || echo '$(srcdir)/'`cons_module.f
-
-libdynamo_a-cons_module.obj: cons_module.f
-	$(AM_V_F77)$(F77) $(libdynamo_a_FFLAGS) $(FFLAGS) -c -o libdynamo_a-cons_module.obj `if test -f 'cons_module.f'; then $(CYGPATH_W) 'cons_module.f'; else $(CYGPATH_W) '$(srcdir)/cons_module.f'; fi`
-
-libdynamo_a-dynamo_module.o: dynamo_module.f
-	$(AM_V_F77)$(F77) $(libdynamo_a_FFLAGS) $(FFLAGS) -c -o libdynamo_a-dynamo_module.o `test -f 'dynamo_module.f' || echo '$(srcdir)/'`dynamo_module.f
-
-libdynamo_a-dynamo_module.obj: dynamo_module.f
-	$(AM_V_F77)$(F77) $(libdynamo_a_FFLAGS) $(FFLAGS) -c -o libdynamo_a-dynamo_module.obj `if test -f 'dynamo_module.f'; then $(CYGPATH_W) 'dynamo_module.f'; else $(CYGPATH_W) '$(srcdir)/dynamo_module.f'; fi`
-
-libdynamo_a-heelis_module.o: heelis_module.f
-	$(AM_V_F77)$(F77) $(libdynamo_a_FFLAGS) $(FFLAGS) -c -o libdynamo_a-heelis_module.o `test -f 'heelis_module.f' || echo '$(srcdir)/'`heelis_module.f
-
-libdynamo_a-heelis_module.obj: heelis_module.f
-	$(AM_V_F77)$(F77) $(libdynamo_a_FFLAGS) $(FFLAGS) -c -o libdynamo_a-heelis_module.obj `if test -f 'heelis_module.f'; then $(CYGPATH_W) 'heelis_module.f'; else $(CYGPATH_W) '$(srcdir)/heelis_module.f'; fi`
 
 libdynamo_a-module_ceee.o: module_ceee.f
 	$(AM_V_F77)$(F77) $(libdynamo_a_FFLAGS) $(FFLAGS) -c -o libdynamo_a-module_ceee.o `test -f 'module_ceee.f' || echo '$(srcdir)/'`module_ceee.f
@@ -418,12 +443,6 @@ libdynamo_a-module_cnmmod.o: module_cnmmod.f
 libdynamo_a-module_cnmmod.obj: module_cnmmod.f
 	$(AM_V_F77)$(F77) $(libdynamo_a_FFLAGS) $(FFLAGS) -c -o libdynamo_a-module_cnmmod.obj `if test -f 'module_cnmmod.f'; then $(CYGPATH_W) 'module_cnmmod.f'; else $(CYGPATH_W) '$(srcdir)/module_cnmmod.f'; fi`
 
-libdynamo_a-module_colath.o: module_colath.f
-	$(AM_V_F77)$(F77) $(libdynamo_a_FFLAGS) $(FFLAGS) -c -o libdynamo_a-module_colath.o `test -f 'module_colath.f' || echo '$(srcdir)/'`module_colath.f
-
-libdynamo_a-module_colath.obj: module_colath.f
-	$(AM_V_F77)$(F77) $(libdynamo_a_FFLAGS) $(FFLAGS) -c -o libdynamo_a-module_colath.obj `if test -f 'module_colath.f'; then $(CYGPATH_W) 'module_colath.f'; else $(CYGPATH_W) '$(srcdir)/module_colath.f'; fi`
-
 libdynamo_a-module_divide.o: module_divide.f
 	$(AM_V_F77)$(F77) $(libdynamo_a_FFLAGS) $(FFLAGS) -c -o libdynamo_a-module_divide.o `test -f 'module_divide.f' || echo '$(srcdir)/'`module_divide.f
 
@@ -436,29 +455,11 @@ libdynamo_a-module_edges.o: module_edges.f
 libdynamo_a-module_edges.obj: module_edges.f
 	$(AM_V_F77)$(F77) $(libdynamo_a_FFLAGS) $(FFLAGS) -c -o libdynamo_a-module_edges.obj `if test -f 'module_edges.f'; then $(CYGPATH_W) 'module_edges.f'; else $(CYGPATH_W) '$(srcdir)/module_edges.f'; fi`
 
-libdynamo_a-module_flwv32.o: module_flwv32.f
-	$(AM_V_F77)$(F77) $(libdynamo_a_FFLAGS) $(FFLAGS) -c -o libdynamo_a-module_flwv32.o `test -f 'module_flwv32.f' || echo '$(srcdir)/'`module_flwv32.f
-
-libdynamo_a-module_flwv32.obj: module_flwv32.f
-	$(AM_V_F77)$(F77) $(libdynamo_a_FFLAGS) $(FFLAGS) -c -o libdynamo_a-module_flwv32.obj `if test -f 'module_flwv32.f'; then $(CYGPATH_W) 'module_flwv32.f'; else $(CYGPATH_W) '$(srcdir)/module_flwv32.f'; fi`
-
-libdynamo_a-module_highlat.o: module_highlat.f
-	$(AM_V_F77)$(F77) $(libdynamo_a_FFLAGS) $(FFLAGS) -c -o libdynamo_a-module_highlat.o `test -f 'module_highlat.f' || echo '$(srcdir)/'`module_highlat.f
-
-libdynamo_a-module_highlat.obj: module_highlat.f
-	$(AM_V_F77)$(F77) $(libdynamo_a_FFLAGS) $(FFLAGS) -c -o libdynamo_a-module_highlat.obj `if test -f 'module_highlat.f'; then $(CYGPATH_W) 'module_highlat.f'; else $(CYGPATH_W) '$(srcdir)/module_highlat.f'; fi`
-
 libdynamo_a-module_htrpex.o: module_htrpex.f
 	$(AM_V_F77)$(F77) $(libdynamo_a_FFLAGS) $(FFLAGS) -c -o libdynamo_a-module_htrpex.o `test -f 'module_htrpex.f' || echo '$(srcdir)/'`module_htrpex.f
 
 libdynamo_a-module_htrpex.obj: module_htrpex.f
 	$(AM_V_F77)$(F77) $(libdynamo_a_FFLAGS) $(FFLAGS) -c -o libdynamo_a-module_htrpex.obj `if test -f 'module_htrpex.f'; then $(CYGPATH_W) 'module_htrpex.f'; else $(CYGPATH_W) '$(srcdir)/module_htrpex.f'; fi`
-
-libdynamo_a-module_init_cons.o: module_init_cons.f
-	$(AM_V_F77)$(F77) $(libdynamo_a_FFLAGS) $(FFLAGS) -c -o libdynamo_a-module_init_cons.o `test -f 'module_init_cons.f' || echo '$(srcdir)/'`module_init_cons.f
-
-libdynamo_a-module_init_cons.obj: module_init_cons.f
-	$(AM_V_F77)$(F77) $(libdynamo_a_FFLAGS) $(FFLAGS) -c -o libdynamo_a-module_init_cons.obj `if test -f 'module_init_cons.f'; then $(CYGPATH_W) 'module_init_cons.f'; else $(CYGPATH_W) '$(srcdir)/module_init_cons.f'; fi`
 
 libdynamo_a-module_init_heelis.o: module_init_heelis.f
 	$(AM_V_F77)$(F77) $(libdynamo_a_FFLAGS) $(FFLAGS) -c -o libdynamo_a-module_init_heelis.o `test -f 'module_init_heelis.f' || echo '$(srcdir)/'`module_init_heelis.f
@@ -508,12 +509,6 @@ libdynamo_a-module_stenmod.o: module_stenmod.f
 libdynamo_a-module_stenmod.obj: module_stenmod.f
 	$(AM_V_F77)$(F77) $(libdynamo_a_FFLAGS) $(FFLAGS) -c -o libdynamo_a-module_stenmod.obj `if test -f 'module_stenmod.f'; then $(CYGPATH_W) 'module_stenmod.f'; else $(CYGPATH_W) '$(srcdir)/module_stenmod.f'; fi`
 
-libdynamo_a-module_sub_dynamo.o: module_sub_dynamo.f
-	$(AM_V_F77)$(F77) $(libdynamo_a_FFLAGS) $(FFLAGS) -c -o libdynamo_a-module_sub_dynamo.o `test -f 'module_sub_dynamo.f' || echo '$(srcdir)/'`module_sub_dynamo.f
-
-libdynamo_a-module_sub_dynamo.obj: module_sub_dynamo.f
-	$(AM_V_F77)$(F77) $(libdynamo_a_FFLAGS) $(FFLAGS) -c -o libdynamo_a-module_sub_dynamo.obj `if test -f 'module_sub_dynamo.f'; then $(CYGPATH_W) 'module_sub_dynamo.f'; else $(CYGPATH_W) '$(srcdir)/module_sub_dynamo.f'; fi`
-
 libdynamo_a-module_sub_heelis.o: module_sub_heelis.f
 	$(AM_V_F77)$(F77) $(libdynamo_a_FFLAGS) $(FFLAGS) -c -o libdynamo_a-module_sub_heelis.o `test -f 'module_sub_heelis.f' || echo '$(srcdir)/'`module_sub_heelis.f
 
@@ -531,12 +526,6 @@ libdynamo_a-module_transf.o: module_transf.f
 
 libdynamo_a-module_transf.obj: module_transf.f
 	$(AM_V_F77)$(F77) $(libdynamo_a_FFLAGS) $(FFLAGS) -c -o libdynamo_a-module_transf.obj `if test -f 'module_transf.f'; then $(CYGPATH_W) 'module_transf.f'; else $(CYGPATH_W) '$(srcdir)/module_transf.f'; fi`
-
-libdynamo_a-module_weimer2005Ipe.o: module_weimer2005Ipe.f
-	$(AM_V_F77)$(F77) $(libdynamo_a_FFLAGS) $(FFLAGS) -c -o libdynamo_a-module_weimer2005Ipe.o `test -f 'module_weimer2005Ipe.f' || echo '$(srcdir)/'`module_weimer2005Ipe.f
-
-libdynamo_a-module_weimer2005Ipe.obj: module_weimer2005Ipe.f
-	$(AM_V_F77)$(F77) $(libdynamo_a_FFLAGS) $(FFLAGS) -c -o libdynamo_a-module_weimer2005Ipe.obj `if test -f 'module_weimer2005Ipe.f'; then $(CYGPATH_W) 'module_weimer2005Ipe.f'; else $(CYGPATH_W) '$(srcdir)/module_weimer2005Ipe.f'; fi`
 
 libdynamo_a-mudcom.o: mudcom.f
 	$(AM_V_F77)$(F77) $(libdynamo_a_FFLAGS) $(FFLAGS) -c -o libdynamo_a-mudcom.o `test -f 'mudcom.f' || echo '$(srcdir)/'`mudcom.f
@@ -562,17 +551,71 @@ libdynamo_a-muh2cr.o: muh2cr.f
 libdynamo_a-muh2cr.obj: muh2cr.f
 	$(AM_V_F77)$(F77) $(libdynamo_a_FFLAGS) $(FFLAGS) -c -o libdynamo_a-muh2cr.obj `if test -f 'muh2cr.f'; then $(CYGPATH_W) 'muh2cr.f'; else $(CYGPATH_W) '$(srcdir)/muh2cr.f'; fi`
 
-libdynamo_a-params.o: params.f
-	$(AM_V_F77)$(F77) $(libdynamo_a_FFLAGS) $(FFLAGS) -c -o libdynamo_a-params.o `test -f 'params.f' || echo '$(srcdir)/'`params.f
-
-libdynamo_a-params.obj: params.f
-	$(AM_V_F77)$(F77) $(libdynamo_a_FFLAGS) $(FFLAGS) -c -o libdynamo_a-params.obj `if test -f 'params.f'; then $(CYGPATH_W) 'params.f'; else $(CYGPATH_W) '$(srcdir)/params.f'; fi`
-
 libdynamo_a-util.o: util.f
 	$(AM_V_F77)$(F77) $(libdynamo_a_FFLAGS) $(FFLAGS) -c -o libdynamo_a-util.o `test -f 'util.f' || echo '$(srcdir)/'`util.f
 
 libdynamo_a-util.obj: util.f
 	$(AM_V_F77)$(F77) $(libdynamo_a_FFLAGS) $(FFLAGS) -c -o libdynamo_a-util.obj `if test -f 'util.f'; then $(CYGPATH_W) 'util.f'; else $(CYGPATH_W) '$(srcdir)/util.f'; fi`
+
+.f90.o:
+	$(AM_V_FC)$(FCCOMPILE) -c -o $@ $<
+
+.f90.obj:
+	$(AM_V_FC)$(FCCOMPILE) -c -o $@ `$(CYGPATH_W) '$<'`
+
+libdynamo_a-cons_module.o: cons_module.f90
+	$(AM_V_FC)$(FC) $(libdynamo_a_FCFLAGS) $(FCFLAGS) -c -o libdynamo_a-cons_module.o `test -f 'cons_module.f90' || echo '$(srcdir)/'`cons_module.f90
+
+libdynamo_a-cons_module.obj: cons_module.f90
+	$(AM_V_FC)$(FC) $(libdynamo_a_FCFLAGS) $(FCFLAGS) -c -o libdynamo_a-cons_module.obj `if test -f 'cons_module.f90'; then $(CYGPATH_W) 'cons_module.f90'; else $(CYGPATH_W) '$(srcdir)/cons_module.f90'; fi`
+
+libdynamo_a-dynamo_module.o: dynamo_module.f90
+	$(AM_V_FC)$(FC) $(libdynamo_a_FCFLAGS) $(FCFLAGS) -c -o libdynamo_a-dynamo_module.o `test -f 'dynamo_module.f90' || echo '$(srcdir)/'`dynamo_module.f90
+
+libdynamo_a-dynamo_module.obj: dynamo_module.f90
+	$(AM_V_FC)$(FC) $(libdynamo_a_FCFLAGS) $(FCFLAGS) -c -o libdynamo_a-dynamo_module.obj `if test -f 'dynamo_module.f90'; then $(CYGPATH_W) 'dynamo_module.f90'; else $(CYGPATH_W) '$(srcdir)/dynamo_module.f90'; fi`
+
+libdynamo_a-heelis_module.o: heelis_module.f90
+	$(AM_V_FC)$(FC) $(libdynamo_a_FCFLAGS) $(FCFLAGS) -c -o libdynamo_a-heelis_module.o `test -f 'heelis_module.f90' || echo '$(srcdir)/'`heelis_module.f90
+
+libdynamo_a-heelis_module.obj: heelis_module.f90
+	$(AM_V_FC)$(FC) $(libdynamo_a_FCFLAGS) $(FCFLAGS) -c -o libdynamo_a-heelis_module.obj `if test -f 'heelis_module.f90'; then $(CYGPATH_W) 'heelis_module.f90'; else $(CYGPATH_W) '$(srcdir)/heelis_module.f90'; fi`
+
+libdynamo_a-module_colath.o: module_colath.f90
+	$(AM_V_FC)$(FC) $(libdynamo_a_FCFLAGS) $(FCFLAGS) -c -o libdynamo_a-module_colath.o `test -f 'module_colath.f90' || echo '$(srcdir)/'`module_colath.f90
+
+libdynamo_a-module_colath.obj: module_colath.f90
+	$(AM_V_FC)$(FC) $(libdynamo_a_FCFLAGS) $(FCFLAGS) -c -o libdynamo_a-module_colath.obj `if test -f 'module_colath.f90'; then $(CYGPATH_W) 'module_colath.f90'; else $(CYGPATH_W) '$(srcdir)/module_colath.f90'; fi`
+
+libdynamo_a-module_flwv32.o: module_flwv32.f90
+	$(AM_V_FC)$(FC) $(libdynamo_a_FCFLAGS) $(FCFLAGS) -c -o libdynamo_a-module_flwv32.o `test -f 'module_flwv32.f90' || echo '$(srcdir)/'`module_flwv32.f90
+
+libdynamo_a-module_flwv32.obj: module_flwv32.f90
+	$(AM_V_FC)$(FC) $(libdynamo_a_FCFLAGS) $(FCFLAGS) -c -o libdynamo_a-module_flwv32.obj `if test -f 'module_flwv32.f90'; then $(CYGPATH_W) 'module_flwv32.f90'; else $(CYGPATH_W) '$(srcdir)/module_flwv32.f90'; fi`
+
+libdynamo_a-module_init_cons.o: module_init_cons.f90
+	$(AM_V_FC)$(FC) $(libdynamo_a_FCFLAGS) $(FCFLAGS) -c -o libdynamo_a-module_init_cons.o `test -f 'module_init_cons.f90' || echo '$(srcdir)/'`module_init_cons.f90
+
+libdynamo_a-module_init_cons.obj: module_init_cons.f90
+	$(AM_V_FC)$(FC) $(libdynamo_a_FCFLAGS) $(FCFLAGS) -c -o libdynamo_a-module_init_cons.obj `if test -f 'module_init_cons.f90'; then $(CYGPATH_W) 'module_init_cons.f90'; else $(CYGPATH_W) '$(srcdir)/module_init_cons.f90'; fi`
+
+libdynamo_a-module_sub_dynamo.o: module_sub_dynamo.f90
+	$(AM_V_FC)$(FC) $(libdynamo_a_FCFLAGS) $(FCFLAGS) -c -o libdynamo_a-module_sub_dynamo.o `test -f 'module_sub_dynamo.f90' || echo '$(srcdir)/'`module_sub_dynamo.f90
+
+libdynamo_a-module_sub_dynamo.obj: module_sub_dynamo.f90
+	$(AM_V_FC)$(FC) $(libdynamo_a_FCFLAGS) $(FCFLAGS) -c -o libdynamo_a-module_sub_dynamo.obj `if test -f 'module_sub_dynamo.f90'; then $(CYGPATH_W) 'module_sub_dynamo.f90'; else $(CYGPATH_W) '$(srcdir)/module_sub_dynamo.f90'; fi`
+
+libdynamo_a-module_weimer2005Ipe.o: module_weimer2005Ipe.f90
+	$(AM_V_FC)$(FC) $(libdynamo_a_FCFLAGS) $(FCFLAGS) -c -o libdynamo_a-module_weimer2005Ipe.o `test -f 'module_weimer2005Ipe.f90' || echo '$(srcdir)/'`module_weimer2005Ipe.f90
+
+libdynamo_a-module_weimer2005Ipe.obj: module_weimer2005Ipe.f90
+	$(AM_V_FC)$(FC) $(libdynamo_a_FCFLAGS) $(FCFLAGS) -c -o libdynamo_a-module_weimer2005Ipe.obj `if test -f 'module_weimer2005Ipe.f90'; then $(CYGPATH_W) 'module_weimer2005Ipe.f90'; else $(CYGPATH_W) '$(srcdir)/module_weimer2005Ipe.f90'; fi`
+
+libdynamo_a-params.o: params.f90
+	$(AM_V_FC)$(FC) $(libdynamo_a_FCFLAGS) $(FCFLAGS) -c -o libdynamo_a-params.o `test -f 'params.f90' || echo '$(srcdir)/'`params.f90
+
+libdynamo_a-params.obj: params.f90
+	$(AM_V_FC)$(FC) $(libdynamo_a_FCFLAGS) $(FCFLAGS) -c -o libdynamo_a-params.obj `if test -f 'params.f90'; then $(CYGPATH_W) 'params.f90'; else $(CYGPATH_W) '$(srcdir)/params.f90'; fi`
 
 ID: $(am__tagged_files)
 	$(am__define_uniq_tagged_files); mkid -fID $$unique

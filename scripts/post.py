@@ -1,15 +1,19 @@
+#!/usr/bin/env python3
+
 import numpy as np
 from netCDF4 import Dataset
 from multiprocessing import Pool
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 import glob
-from os import path, remove
+from os import path, remove, system
 from datetime import datetime
+import time
 
 class Grid:
   def __init__(self, path):
     # nlp, nmp, nfluxtube, nlon_geo, nlat_geo, nheights_geo
     # flux_tube_max(lp), facfac_interface, ii[1-4]_interface, dd_interface
+    print('-> Reading grid file : ', path)
     g = Dataset(path)
 
     self.nlp          = len(g.dimensions['phony_dim_0'])
@@ -31,8 +35,15 @@ class Grid:
     for i in range(self.nlat_geo):
       self.latitude_geo[i]  = -90. + i * 180. / (self.nlat_geo-1)
 
-    for i in range(self.nheights_geo):
-      self.altitude_geo[i]  = i*5. + 90.
+    dAlt = 5.0
+    self.altitude_geo[0]  = 90.
+    for i in range(1, self.nheights_geo):
+      if (self.altitude_geo[i-1] >= 400.0):
+        dAlt = 10.0
+      if (self.altitude_geo[i-1] >= 1200.0):
+        dAlt = 20.0
+      self.altitude_geo[i]  = self.altitude_geo[i-1] + dAlt
+
 
     self.facfac_interface = np.zeros( (3, self.nlon_geo, self.nlat_geo, self.nheights_geo) )
     self.dd_interface     = np.zeros( (3, self.nlon_geo, self.nlat_geo, self.nheights_geo) )
@@ -163,23 +174,29 @@ class IPE:
       dt_sec = (t - datetime(1965,1,1)).total_seconds()
       time_out[0] = dt_sec
 
-      z_var = o.createVariable('z',  'f4', 'z')
+      # Modify these to provide 3D data to be consistent with
+      # GITM / Aether results
+      z_var = o.createVariable('z',  'f4', ('lon','lat','z'))
       z_var.long_name = 'Altitude'
       z_var.units     = 'km'
 
-      y_var = o.createVariable('lat',  'f4', 'lat')
+      y_var = o.createVariable('lat', 'f4', ('lon','lat','z'))
       y_var.long_name = 'Latitude'
       y_var.units     = 'degrees_north'
 
-      x_var = o.createVariable('lon', 'f4', 'lon')
+      x_var = o.createVariable('lon', 'f4', ('lon','lat','z'))
       x_var.long_name = 'Longitude'
       x_var.units     = 'degrees_east'
 
       # Variables
-      op_var   = o.createVariable('o_plus',               'f4', ('lon','lat','z'))
+      e_var   = o.createVariable('e-', 'f4', ('lon','lat','z'))
+      e_var.long_name = "electron number density"
+      e_var.units     = "m^{-3}"
+
+      op_var   = o.createVariable('o_plus', 'f4', ('lon','lat','z'))
       op_var.long_name = "O+ number density"
       op_var.units     = "m^{-3}"
-
+      
       hp_var   = o.createVariable('h_plus',               'f4', ('lon','lat','z'))
       hp_var.long_name = "H+ number density"
       hp_var.units     = "m^{-3}"
@@ -272,19 +289,59 @@ class IPE:
       et_var.long_name = "Electron temperature"
       et_var.units     = "K"
 
-      z_var[:] = self.grid.altitude_geo
-      y_var[:] = self.grid.latitude_geo
-      x_var[:] = self.grid.longitude_geo
+      nLons = len(self.grid.longitude_geo)
+      nLats = len(self.grid.latitude_geo)
+      nAlts = len(self.grid.altitude_geo)
 
-      op_var[:]   = self.grid.interpolate_to_geogrid(self.plasma.ion_densities[0])
-      hp_var[:]   = self.grid.interpolate_to_geogrid(self.plasma.ion_densities[1])
-      hep_var[:]  = self.grid.interpolate_to_geogrid(self.plasma.ion_densities[2])
-      np_var[:]   = self.grid.interpolate_to_geogrid(self.plasma.ion_densities[3])
-      nop_var[:]  = self.grid.interpolate_to_geogrid(self.plasma.ion_densities[4])
-      o2p_var[:]  = self.grid.interpolate_to_geogrid(self.plasma.ion_densities[5])
-      n2p_var[:]  = self.grid.interpolate_to_geogrid(self.plasma.ion_densities[6])
-      op2d_var[:] = self.grid.interpolate_to_geogrid(self.plasma.ion_densities[7])
-      op2p_var[:] = self.grid.interpolate_to_geogrid(self.plasma.ion_densities[8])
+      lons3d = np.zeros((nLons, nLats, nAlts))
+      lats3d = np.zeros((nLons, nLats, nAlts))
+      alts3d = np.zeros((nLons, nLats, nAlts))
+      electron = np.zeros((nLons, nLats, nAlts))
+
+      for iLon in range(nLons):
+        for iLat in range(nLats):
+          alts3d[iLon, iLat, :] = self.grid.altitude_geo * 1000.0
+      for iLon in range(nLons):
+        for iAlt in range(nAlts):
+          lats3d[iLon, :, iAlt] = self.grid.latitude_geo
+      for iLat in range(nLats):
+        for iAlt in range(nAlts):
+          lons3d[:, iLat, iAlt] = self.grid.longitude_geo
+
+      z_var[:] = alts3d
+      y_var[:] = lats3d
+      x_var[:] = lons3d
+
+      op = self.grid.interpolate_to_geogrid(self.plasma.ion_densities[0])
+      op_var[:] = op
+
+      hp = self.grid.interpolate_to_geogrid(self.plasma.ion_densities[1])
+      hp_var[:] = hp
+      
+      hep = self.grid.interpolate_to_geogrid(self.plasma.ion_densities[2])
+      hep_var[:] = hep
+
+      n1p   = self.grid.interpolate_to_geogrid(self.plasma.ion_densities[3])
+      np_var[:] = n1p
+
+      nop  = self.grid.interpolate_to_geogrid(self.plasma.ion_densities[4])
+      nop_var[:] = nop
+
+      o2p  = self.grid.interpolate_to_geogrid(self.plasma.ion_densities[5])
+      o2p_var[:] = o2p
+
+      n2p  = self.grid.interpolate_to_geogrid(self.plasma.ion_densities[6])
+      n2p_var[:] = n2p
+
+      op2d = self.grid.interpolate_to_geogrid(self.plasma.ion_densities[7])
+      op2d_var[:] = op2d
+
+      op2p = self.grid.interpolate_to_geogrid(self.plasma.ion_densities[8])
+      op2p_var[:] = op2p
+
+      electron = op + hp 
+      e_var[:] = electron
+
       he_var[:]   = self.grid.interpolate_to_geogrid(self.neutral.helium)
       o_var[:]    = self.grid.interpolate_to_geogrid(self.neutral.oxygen)
       o2_var[:]   = self.grid.interpolate_to_geogrid(self.neutral.molecular_oxygen)
@@ -306,14 +363,38 @@ class IPE:
 
     return
 
+# ----------------------------------------------------------------------
+# do system command
+# ----------------------------------------------------------------------
+
+def run_command(command):
+    if (IsVerbose):
+        print("   -> Running Command : ")
+        print("      ", command)
+    system(command)
+    return True
+
 def load_and_write(i):
-  print(files[i])
+  print('-> Reading file : ', files[i])
   timestamp = files[i][-15:-3]
   ipe.read_h5(files[i])
-  ipe.write_netcdf(path.join(out_dir,"IPE_Params.geo.{}.nc".format(timestamp)), 
-                   timestamp)
-
-
+  fileout = path.join(out_dir,"IPE_Params.geo.{}.nc".format(timestamp))
+  print('--> Writing file : ', fileout)
+  ipe.write_netcdf(fileout, timestamp)
+  if (mv_dir):
+    command = 'mv ' + files[i] + ' ' + mv_dir
+    run_command(command)
+    if (gzip_files):
+      command = 'cd ' + mv_dir + '; gzip -v ' + files[i] + '; cd -'
+      run_command(command)
+    file2d = "ipe_2d.{}.nc".format(timestamp)
+    command = 'mv ' + file2d + ' ' + out_dir
+    run_command(command)
+  else:
+    if (gzip_files):
+      command = 'gzip -v ' + files[i]
+      run_command(command)
+    
 ## input parsing options
 parser = ArgumentParser(description='Interpolate IPE Outputs to a geographic grid',
                         formatter_class=ArgumentDefaultsHelpFormatter)
@@ -323,30 +404,81 @@ parser.add_argument('-i', '--indir',  type=str, default="./",
                     help='path to input directory, if different from pwd')
 parser.add_argument('-o', '--outdir', default=None,
                     help='path to output directory, if you do not want to write to indir')
+parser.add_argument('-s', '--spheredir', default='UA/sphereOutput/',
+                    help='path to output sphere files')
+parser.add_argument('-m', '--movedir', default='UA/output/',
+                    help='path to move output files')
+parser.add_argument('-gzip', action='store_true',
+                    help='gzip original files')
 parser.add_argument('-keep', action='store_true',
-                    help="Include this flag to not delete the raw outputs")
+                    help='Include this flag to not delete the raw outputs')
+parser.add_argument('-v', action='store_true',
+                    help='turn verbose on')
+parser.add_argument('-um', action='store_true',
+                    help='use UM defaults (spheredir and movedir)')
 parser.add_argument('-n', '--nprocs', type=int, default=1,
                     help='Number of processors to use.')
+parser.add_argument('-totaltime',
+                    help = 'specify how long to run in total in hours, (default 0 - only run once)',
+                    default = 0, type = int)
+parser.add_argument('-sleep',
+                    help = 'how long to sleep between loops in seconds, (default 900)',
+                    default = 900, type = int)
+
 args = parser.parse_args()
 
+IsVerbose = args.v
 
 # Set defaults for outdir & gridfile
-out_dir = args.indir if args.outdir is None else args.outdir
+if (args.um):
+  out_dir = args.spheredir
+  mv_dir = args.movedir
+else:
+  out_dir = args.indir if args.outdir is None else args.outdir
+  mv_dir = None
+gzip_files = args.gzip
 grid_file = path.join(args.indir, 'IPE_Grid.nc') if args.gridfile is None else args.gridfile
 
 # Read in grid, find input files
 ipe = IPE(grid_file)
-files = glob.glob(path.join(args.indir,"IPE_State.apex.*"))
 
+DidWork = True
+startTime = datetime.now()
 
-if args.nprocs > 1:
-  p = Pool(min([len(files),args.nprocs]))
-  p.map(load_and_write,range(len(files)))
-else:
-  for iFile in range(len(files)):
-    load_and_write(iFile)
+while DidWork:
+  
+  files = sorted(glob.glob(path.join(args.indir,"IPE_State.apex.*")))
 
+  if args.nprocs > 1:
+    p = Pool(min([len(files),args.nprocs]))
+    p.map(load_and_write,range(len(files)))
+  else:
+    for iFile in range(len(files)):
+      load_and_write(iFile)
+
+  currentTime = datetime.now()
+  dt = ((currentTime - startTime).total_seconds())/3600.0
+  if (dt > args.totaltime):
+    if args.totaltime == 0:
+      # Different exit message for non-continuous runs 
+      print(" -> All done!")
+    else:
+      print(" -> Stopping due to totaltime exceeded!")
+    # want to break out of loop, so set loop breaking condition:
+    DidWork = False
+    
+  if (DidWork):
+    # everything ok, go to sleep for a bit
+    print('Sleeping ... ', args.sleep, ' sec.')
+    time.sleep(args.sleep)
+    
+#if (mv_dir):
+#  for eachFile in files:
+#    command = 'mv ' + eachFile + ' ' + mv_dir
+#    run_command(command)
+
+    
 # Remove files if we are not told to -keep them
-if not args.keep:
-  for eachFile in files:
-    remove(eachFile)
+#if not args.keep:
+#  for eachFile in files:
+#    remove(eachFile)

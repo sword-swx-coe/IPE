@@ -35,6 +35,9 @@ ipe_x_FCFLAGS = $(FC_MODINC) ipelib \
         $(FC_MODINC) ipelib/shared
 
 ipe_x_LDADD = $(builddir)/ipelib/libipe.a
+
+# Recompile the driver when model modules or derived-type layouts change.
+ipe_x-IPE_Driver.$(OBJEXT): $(builddir)/ipelib/libipe.a
 endif
 
 .PHONY: clean-modules
