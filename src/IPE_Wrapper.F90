@@ -164,6 +164,15 @@ CONTAINS
         RETURN
       ENDIF
 
+      CALL ipe % Write2d( rc=localrc )
+      IF( localrc /= IPE_SUCCESS ) THEN
+        CALL ESMF_LogSetError(ESMF_RC_FILE_WRITE, msg="Error writing 2D IPE output", &
+          line=__LINE__, &
+          file=__FILE__, &
+          rcToReturn=rc)
+        RETURN
+      ENDIF
+
     ENDIF
 
   END SUBROUTINE Update_IPE
