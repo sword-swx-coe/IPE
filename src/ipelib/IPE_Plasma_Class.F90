@@ -485,8 +485,10 @@ CONTAINS
           mlts2d(iMlt, iLat) = mlts2d(iMlt, lp)
        enddo
     enddo
-    call ieModel_ % nMlts(nMlts)
-    call ieModel_ % nLats(nLats)      
+    ! Pass the actual array extents so the IE library's explicit-shape dummies
+    ! can never disagree with the arrays handed to grid()/get_aurora().
+    call ieModel_ % nMlts(size(mlts2d, 1))
+    call ieModel_ % nLats(size(mlts2d, 2))
     call ieModel_ % grid(mlts2d, lats2d)
 
     if (doCalculateArea) then
