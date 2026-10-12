@@ -728,13 +728,13 @@
 !
       character(len=16) :: fname
       character(len=1024) :: errmsg
-      integer :: i,lu=20
+      integer :: i,lu
       integer :: csize_rd,d1_rd,d2_rd
       integer :: iulog=6, ios
 !
       if (present(rc)) rc = IPE_SUCCESS
 !
-      open(lu,file=infile,status='old', ACCESS ='SEQUENTIAL',
+      open(newunit=lu,file=infile,status='old', ACCESS ='SEQUENTIAL',
      &     iostat=ios)
       if (ipe_iostatus_check(ios,msg="error opening file "//infile,
      &  rc=rc)) return
@@ -807,12 +807,12 @@
 ! Local:
 !
       character(len=16) :: fname
-      integer :: i,j,lu=20
+      integer :: i,j,lu
       integer :: iulog=6, ios
 !
       if (present(rc)) rc = IPE_SUCCESS
 !
-      open(lu,file=infile,status='old', ACCESS ='SEQUENTIAL',
+      open(newunit=lu,file=infile,status='old', ACCESS ='SEQUENTIAL',
      &     iostat=ios)
       if (ipe_iostatus_check(ios,msg="error opening file "//infile,
      &  rc=rc)) return
@@ -853,12 +853,12 @@
 ! Local:
 !
       character(len=16) :: fname
-      integer :: rd_na,rd_nb,lu=20
+      integer :: rd_na,rd_nb,lu
       integer :: iulog=6, ios
 !
       if (present(rc)) rc = IPE_SUCCESS
 !
-      open(lu,file=infile,status='old', ACCESS ='SEQUENTIAL',
+      open(newunit=lu,file=infile,status='old', ACCESS ='SEQUENTIAL',
      &     iostat=ios)
       if (ipe_iostatus_check(ios,msg="error opening file "//infile,
      &  rc=rc)) return

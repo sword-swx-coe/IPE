@@ -736,12 +736,12 @@
 !
       character(len=16)   :: fname
       character(len=1024) :: errmsg
-      integer :: i,stat,lu=20
+      integer :: i,stat,lu
       integer :: csize_rd,d1_rd,d2_rd
 
       if (present(rc)) rc = IPE_SUCCESS
 !
-      open(lu,file=infile,status='old',ACCESS='SEQUENTIAL',iostat=stat)
+      open(newunit=lu,file=infile,status='old',ACCESS='SEQUENTIAL',iostat=stat)
       if (ipe_iostatus_check(stat, msg="error opening file "//infile, rc=rc)) return
       read(lu,"(a)",iostat=stat) fname
       if (ipe_iostatus_check(stat, msg="error reading filename", rc=rc)) return
@@ -804,11 +804,11 @@
 ! Local:
 !
       character(len=16) :: fname
-      integer :: stat,i,j,lu=20
+      integer :: stat,i,j,lu
 !
       if (present(rc)) rc = IPE_SUCCESS
 !
-      open(lu,file=infile,status='old',ACCESS='SEQUENTIAL',iostat=stat)
+      open(newunit=lu,file=infile,status='old',ACCESS='SEQUENTIAL',iostat=stat)
       if (ipe_iostatus_check(stat, msg="error opening file "//infile, rc=rc)) return
       read(lu,"(a)",iostat=stat) fname
       if (ipe_iostatus_check(stat, msg="error reading filename", rc=rc)) return
@@ -842,9 +842,9 @@
 !
       character(len=16)   :: fname
       character(len=1024) :: errmsg
-      integer :: stat,rd_na,rd_nb,lu=20
+      integer :: stat,rd_na,rd_nb,lu
 !
-      open(lu,file=infile,status='old',ACCESS='SEQUENTIAL',iostat=stat)
+      open(newunit=lu,file=infile,status='old',ACCESS='SEQUENTIAL',iostat=stat)
       if (ipe_iostatus_check(stat, msg="error opening file "//infile, rc=rc)) return
       read(lu,"(a)",iostat=stat) fname
       if (ipe_iostatus_check(stat, msg="error reading filename", rc=rc)) return
