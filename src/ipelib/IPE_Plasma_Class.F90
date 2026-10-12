@@ -42,6 +42,9 @@ MODULE IPE_Plasma_Class
 
     REAL(prec), ALLOCATABLE :: aurora_eflux2d(:,:)
     REAL(prec), ALLOCATABLE :: aurora_avee2d(:,:)
+    ! Southern-hemisphere foot-point values (diagnostic output only)
+    REAL(prec), ALLOCATABLE :: aurora_eflux2d_s(:,:)
+    REAL(prec), ALLOCATABLE :: aurora_avee2d_s(:,:)
 
     CONTAINS
 
@@ -180,6 +183,8 @@ CONTAINS
     ALLOCATE( &
          plasma % aurora_eflux2d(1:NLP,iStart:iEnd), &
          plasma % aurora_avee2d(1:NLP,iStart:iEnd), &
+         plasma % aurora_eflux2d_s(1:NLP,iStart:iEnd), &
+         plasma % aurora_avee2d_s(1:NLP,iStart:iEnd), &
          stat = stat )
     IF ( ipe_alloc_check( stat, &
          msg="Failed to allocate plasma AURORA arrays", &
@@ -252,6 +257,8 @@ CONTAINS
 
     DEALLOCATE( plasma % aurora_eflux2d, &
                 plasma % aurora_avee2d, &
+                plasma % aurora_eflux2d_s, &
+                plasma % aurora_avee2d_s, &
                 stat = stat )
     IF ( ipe_dealloc_check( stat, msg="Unable to free up plasma - AURORA memory", &
       line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
@@ -310,6 +317,8 @@ CONTAINS
     ! Initialize output variables to zero
     plasma % aurora_eflux2d = 0.0
     plasma % aurora_avee2d = 0.0
+    plasma % aurora_eflux2d_s = 0.0
+    plasma % aurora_avee2d_s = 0.0
 
     CALL plasma % Test_Transport_Time_step( &
          grid, v_ExB, time_step, mpi_layer, &
@@ -385,6 +394,9 @@ CONTAINS
              iMltS = iMlt - (mpi_layer % mp_low - grid % mp_halo) + 1
              plasma % aurora_eflux2d(iLat, iMlt) = eflux2d(iMltS, iLat)
              plasma % aurora_avee2d(iLat, iMlt) = avee2d(iMltS, iLat)
+             ! southern foot point of the same flux tube:
+             plasma % aurora_eflux2d_s(iLat, iMlt) = eflux2d(iMltS, nLats - iLat + 1)
+             plasma % aurora_avee2d_s(iLat, iMlt) = avee2d(iMltS, nLats - iLat + 1)
            enddo
          enddo
 
@@ -1622,6 +1634,9 @@ CONTAINS
             else
                plasma % aurora_eflux2d(lp, mp) = eflux
                plasma % aurora_avee2d(lp, mp) = ch * 2
+               ! TIROS path uses |mlat| -> hemispherically symmetric:
+               plasma % aurora_eflux2d_s(lp, mp) = eflux
+               plasma % aurora_avee2d_s(lp, mp) = ch * 2
 
             endif
 #endif

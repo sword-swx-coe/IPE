@@ -799,6 +799,15 @@ CONTAINS
         ipe % plasma % aurora_avee2d(1:ipe % grid % NLP, ipe % mpi_layer % mp_low:ipe % mpi_layer % mp_high))
     IF (ipe % io % err % check(msg="Unable to write dataset AveE", &
         file=__FILE__, line=__LINE__)) RETURN
+    ! Southern-hemisphere foot-point drivers:
+    CALL ipe % io % write("EFlux_S", &
+        ipe % plasma % aurora_eflux2d_s(1:ipe % grid % NLP, ipe % mpi_layer % mp_low:ipe % mpi_layer % mp_high))
+    IF (ipe % io % err % check(msg="Unable to write dataset EFlux_S", &
+        file=__FILE__, line=__LINE__)) RETURN
+    CALL ipe % io % write("AveE_S", &
+        ipe % plasma % aurora_avee2d_s(1:ipe % grid % NLP, ipe % mpi_layer % mp_low:ipe % mpi_layer % mp_high))
+    IF (ipe % io % err % check(msg="Unable to write dataset AveE_S", &
+        file=__FILE__, line=__LINE__)) RETURN
 
     ! Close HDF5 file
     CALL ipe % io % close()
