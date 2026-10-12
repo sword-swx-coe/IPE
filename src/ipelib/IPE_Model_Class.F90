@@ -771,6 +771,13 @@ CONTAINS
         ipe % eldyn % electric_potential(1:ipe % grid % NLP, ipe % mpi_layer % mp_low:ipe % mpi_layer % mp_high, NORTH))
     IF (ipe % io % err % check(msg="Unable to write dataset ElectricPotential", &
         file=__FILE__, line=__LINE__)) RETURN
+    ! Southern-hemisphere footpoint slot of the same potential [V]
+    ! (electric_potential(:,:,SOUTH)); equal to ElectricPotential when
+    ! exb_hemispheric = 0. Lets NH/SH potential asymmetry be diagnosed directly.
+    CALL ipe % io % write("ElectricPotential_S", &
+        ipe % eldyn % electric_potential(1:ipe % grid % NLP, ipe % mpi_layer % mp_low:ipe % mpi_layer % mp_high, SOUTH))
+    IF (ipe % io % err % check(msg="Unable to write dataset ElectricPotential_S", &
+        file=__FILE__, line=__LINE__)) RETURN
     CALL ipe % io % write("ExB_apex_e1_N", &
         ipe % eldyn % v_ExB_apex(1, 1:ipe % grid % NLP, ipe % mpi_layer % mp_low:ipe % mpi_layer % mp_high, NORTH))
     IF (ipe % io % err % check(msg="Unable to write dataset ExB_apex_e1_N", &
