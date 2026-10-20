@@ -1,0 +1,84 @@
+##### IPE (um_make) on Apple-silicon macOS (tested: MacBook Pro M3 Max, macOS 26.6.1, 2026-08-29)
+
+
+# ---- 0. Xcode CLT + MacPorts ---------------------------------------------------------
+xcode-select --install
+sudo port selfupdate
+sudo port install gcc13 mpich-gcc13 gmake python311 wget
+sudo port select --set gcc mp-gcc13
+sudo port select --set mpi mpich-gcc13-fortran
+sudo port select --set python3 python311
+# MacPorts first on PATH for EVERY step below (Homebrew gfortran/mpifort must not win):
+export PATH=/opt/local/bin:/opt/local/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
+gfortran-mp-13 --version                       # GCC 13.x
+/opt/local/bin/mpifort-mpich-gcc13 --version   # GCC 13.x
+
+# ---- 1. Parallel NetCDF 1.15.0 (from source; MacPorts pnetcdf .mod may not match) --------
+cd
+wget https://parallel-netcdf.github.io/Release/pnetcdf-1.15.0.tar.gz
+tar xzf pnetcdf-1.15.0.tar.gz && cd pnetcdf-1.15.0
+./configure --prefix=$HOME/pnetcdf_install --with-mpi=/opt/local \
+            FC=gfortran-mp-13 CC=gcc-mp-13 CXX=g++-mp-13
+make -j4 && make install
+
+# ---- 2. COMIO (no HDF5 needed) --------------------------------------------------------
+cd
+git clone https://github.com/NOAA-SWPC/COMIO.git COMIO_src && cd COMIO_src
+./configure --prefix=$HOME/COMIO_install --with-pnetcdf=$HOME/pnetcdf_install --without-hdf5
+make -j4 && make install
+
+# ---- 3. ESMF (gfortran for Fortran, clang for C/C++; g++-13 cannot compile ESMF) ---------
+cd
+git clone --depth 1 https://github.com/esmf-org/esmf.git ESMF_src && cd ESMF_src
+export ESMF_DIR=$HOME/ESMF_src
+export ESMF_COMPILER=gfortranclang
+export ESMF_COMM=mpich
+export ESMF_F90=/opt/local/bin/mpifort-mpich-gcc13
+export ESMF_CXX=/opt/local/bin/mpicxx-mpich-gcc13
+export ESMF_C=/opt/local/bin/mpicc-mpich-gcc13
+export MPICH_CXX=/usr/bin/clang++
+export MPICH_CC=/usr/bin/clang
+export ESMF_CSTD=2x
+export ESMF_CXXCOMPILEOPTS=-Wno-deprecated-declarations
+export ESMF_BOPT=g
+export ESMF_INSTALL_PREFIX=$HOME/ESMF_install
+gmake info            # Fortran = MacPorts gcc13, ESMF_COMM=mpich
+gmake -j12 && gmake install                    # ~10 min on M3 Max
+ls $HOME/ESMF_install/lib/libg/                # Darwin.gfortranclang.64.mpich.default
+# check: esmf.mk says ESMF_F90COMPILER=/opt/local/bin/mpifort-mpich-gcc13
+#        otool -L .../libesmf.dylib lists only /opt/local/lib/mpich-gcc13/* MPI libs
+
+# ---- 4. IPE via the UM Makefile system  -------
+cd ~/repos
+git clone <IPE repo> swordIPE && cd swordIPE && git checkout um_make
+# build/Makefile.conf.mac.m3max ships in build/ (paths are $HOME-relative; edit if you
+# installed elsewhere or ESMF_ARCH differs from the ls above)
+python3 Config.py -conf=mac.m3max      # links Makefile.conf, writes Makefile.dirs, clones ext/*
+# ext libraries: make sure their build/Makefile.conf uses gfortran-mp-13 / mpifort-mpich-gcc13
+(cd ext/Electrodynamics && ./config.sh --compiler gfortran)
+(cd ext/srcIndices      && ./config.sh --compiler gfortran)
+mkdir -p lib
+make -j                                # -> bin/ipe.exe
+otool -L bin/ipe.exe | grep mpi        # only /opt/local/lib/mpich-gcc13/*
+#  test (this error message == success):
+./bin/ipe.exe
+#   IPE: ERROR - IPE_Model_Parameters_Class.F90:376    Input file IPE.inp not found
+
+# ---- 5. Standalone test (8 ranks, ~2 min) --------------------------------------------
+cd test
+# 'make data' is broken ($bucket -> must be $(bucket)); fetch by hand (6.4 GB):
+wget https://noaa-nws-wam-ipe-pds.s3.amazonaws.com/NON-OPERATIONAL_RESEARCH/SWORD_DATA/IPE_STANDALONE_FIX.tar.gz
+tar xf IPE_STANDALONE_FIX.tar.gz && rm IPE_STANDALONE_FIX.tar.gz        # -> test/data
+# NOTE: the restart file in this tarball (md5 bbbe50dc...) is NOT the one test/Makefile expects
+# (md5 951f6543...). Get the correct IPE_State.apex.201303160000.nc from derecho.
+mkdir -p ../install/bin && ln -sf ../../bin/ipe.exe ../install/bin/ipe.x
+make test_rundir && cd run
+# this branch needs a &MILE namelist and reads data from UA/dataIn/ (-DHAVE_MILE):
+cp ../IPE.inp . && sed -n '/&MILE/,/^\//p' ../../srcData/IPE.inp >> IPE.inp
+sed -i '' "s|MILE_DIR = .*|MILE_DIR = '$(cd ../../ext/Electrodynamics/data/ext && pwd)/',|" IPE.inp
+for f in ../data/*; do b=$(basename $f); [ -e $b ] || [ $b = IPE.inp ] || ln -s $f .; done   # F107 etc. are read from cwd
+mkdir -p UA/dataIn UA/output && (cd UA/dataIn && ln -sf ../../../data/* .)
+/opt/local/bin/mpiexec-mpich-gcc13 -n 8 ./ipe.x > runlog 2>&1     # NOT Homebrew mpiexec
+ls IPE_State.apex.2013031600*.nc       # ...0005.nc and ...0010.nc = success
+cd .. && python3 scripts/compare_sums.py run/IPE_State.apex.201303160005.nc reference.txt
+# (differences <= 1e-4 are pass)

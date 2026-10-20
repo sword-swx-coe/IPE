@@ -42,6 +42,9 @@ MODULE IPE_Plasma_Class
 
     REAL(prec), ALLOCATABLE :: aurora_eflux2d(:,:)
     REAL(prec), ALLOCATABLE :: aurora_avee2d(:,:)
+    ! Southern-hemisphere foot-point values (diagnostic output only)
+    REAL(prec), ALLOCATABLE :: aurora_eflux2d_s(:,:)
+    REAL(prec), ALLOCATABLE :: aurora_avee2d_s(:,:)
 
     CONTAINS
 
@@ -180,6 +183,8 @@ CONTAINS
     ALLOCATE( &
          plasma % aurora_eflux2d(1:NLP,iStart:iEnd), &
          plasma % aurora_avee2d(1:NLP,iStart:iEnd), &
+         plasma % aurora_eflux2d_s(1:NLP,iStart:iEnd), &
+         plasma % aurora_avee2d_s(1:NLP,iStart:iEnd), &
          stat = stat )
     IF ( ipe_alloc_check( stat, &
          msg="Failed to allocate plasma AURORA arrays", &
@@ -252,6 +257,8 @@ CONTAINS
 
     DEALLOCATE( plasma % aurora_eflux2d, &
                 plasma % aurora_avee2d, &
+                plasma % aurora_eflux2d_s, &
+                plasma % aurora_avee2d_s, &
                 stat = stat )
     IF ( ipe_dealloc_check( stat, msg="Unable to free up plasma - AURORA memory", &
       line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
@@ -282,8 +289,9 @@ CONTAINS
     TYPE( IPE_Forcing ), INTENT(in) :: forcing
     TYPE( IPE_Time ), INTENT(in) :: time_tracker
     TYPE( IPE_MPI_Layer ), INTENT(in) :: mpi_layer
+    ! Apex ExB drift [m/s] per hemispheric leg (last index NORTH:SOUTH)
     REAL(prec), INTENT(in) :: &
-         v_ExB(1:3, 1:grid % NLP, grid % mp_low : grid % mp_high)
+         v_ExB(1:3, 1:grid % NLP, grid % mp_low : grid % mp_high, NORTH:SOUTH)
     REAL(prec), INTENT(in) :: time_step
     REAL(prec), INTENT(in) :: colfac
     REAL(prec), INTENT(in) :: hpeq
@@ -309,6 +317,8 @@ CONTAINS
     ! Initialize output variables to zero
     plasma % aurora_eflux2d = 0.0
     plasma % aurora_avee2d = 0.0
+    plasma % aurora_eflux2d_s = 0.0
+    plasma % aurora_avee2d_s = 0.0
 
     CALL plasma % Test_Transport_Time_step( &
          grid, v_ExB, time_step, mpi_layer, &
@@ -384,6 +394,9 @@ CONTAINS
              iMltS = iMlt - (mpi_layer % mp_low - grid % mp_halo) + 1
              plasma % aurora_eflux2d(iLat, iMlt) = eflux2d(iMltS, iLat)
              plasma % aurora_avee2d(iLat, iMlt) = avee2d(iMltS, iLat)
+             ! southern foot point of the same flux tube:
+             plasma % aurora_eflux2d_s(iLat, iMlt) = eflux2d(iMltS, nLats - iLat + 1)
+             plasma % aurora_avee2d_s(iLat, iMlt) = avee2d(iMltS, nLats - iLat + 1)
            enddo
          enddo
 
@@ -473,8 +486,10 @@ CONTAINS
           mlts2d(iMlt, iLat) = mlts2d(iMlt, lp)
        enddo
     enddo
-    call ieModel_ % nMlts(nMlts)
-    call ieModel_ % nLats(nLats)      
+    ! Pass the actual array extents so the IE library's explicit-shape dummies
+    ! can never disagree with the arrays handed to grid()/get_aurora().
+    call ieModel_ % nMlts(size(mlts2d, 1))
+    call ieModel_ % nLats(size(mlts2d, 2))
     call ieModel_ % grid(mlts2d, lats2d)
 
     if (doCalculateArea) then
@@ -883,11 +898,12 @@ CONTAINS
 
     CLASS( IPE_Plasma ), INTENT(inout) :: plasma
     TYPE( IPE_Grid ), INTENT(in)       :: grid
-    REAL(prec), INTENT(in)             :: v_ExB(1:3,1:grid % NLP, grid % mp_low:grid % mp_high)
+    REAL(prec), INTENT(in)             :: v_ExB(1:3,1:grid % NLP, grid % mp_low:grid % mp_high, NORTH:SOUTH)
     REAL(prec), INTENT(in)             :: time_step
     TYPE( IPE_MPI_Layer ), INTENT(in)  :: mpi_layer
     INTEGER, INTENT(in)                :: perp_transport_max_lp
     ! Local
+    INTEGER    :: ihem
     REAL(prec) :: colat_90km(1:grid % NLP)
     REAL(prec) :: phi_t0 !magnetic longitude,phi[rad] at t0(previous time step)
     REAL(prec) :: theta_t0 !magnetic latitude,theta[rad] at t0
@@ -910,8 +926,11 @@ CONTAINS
         DO 200 lp = 1, perp_transport_max_lp
 
 
-           transport_convection_ratio(lp,mp) = &
-                (abs(v_ExB(1,lp,mp)*time_step/(r*sin( colat_90km(lp)))) * rad_to_deg) / longitude_spacing
+           ! Maximum over the two hemispheric legs of the tube
+           DO ihem = NORTH, SOUTH
+           transport_convection_ratio(lp,mp) = MAX( transport_convection_ratio(lp,mp), &
+                (abs(v_ExB(1,lp,mp,ihem)*time_step/(r*sin( colat_90km(lp)))) * rad_to_deg) / longitude_spacing )
+           ENDDO
 !         write(7000 + mpi_layer % rank_id, *) mp , lp , transport_convection_ratio(lp,mp)
 
  200    CONTINUE
@@ -929,7 +948,7 @@ CONTAINS
 
     CLASS( IPE_Plasma ),   INTENT(inout) :: plasma
     TYPE( IPE_Grid ),      INTENT(in)    :: grid
-    REAL(prec),            INTENT(in)    :: v_ExB(1:3,1:grid % NLP, grid % mp_low:grid % mp_high)
+    REAL(prec),            INTENT(in)    :: v_ExB(1:3,1:grid % NLP, grid % mp_low:grid % mp_high, NORTH:SOUTH)
     REAL(prec),            INTENT(in)    :: time_step
     TYPE( IPE_MPI_Layer ), INTENT(in)    :: mpi_layer
     INTEGER,               INTENT(in)    :: transport_highlat_lp
@@ -968,6 +987,8 @@ CONTAINS
     INTEGER    :: mp, lp, i, lpx, mpx, jth
     INTEGER    :: i_min(1:2)
     LOGICAL    :: i_convection_too_far_in_lp
+    INTEGER    :: ihem, i_lo, i_hi
+    LOGICAL    :: report_leg
     REAL(prec), PARAMETER :: rad_to_deg = 57.295779513
     CHARACTER(len=128) :: errmsg
 
@@ -987,13 +1008,34 @@ CONTAINS
     DO 100 mp = plasma % mp_low, plasma % mp_high
       DO 200 lp = 1, perp_transport_max_lp
 
+      ! Split-tube transport: each hemispheric leg of the tube is traced back
+      ! with its own drift v_ExB(:,lp,mp,ihem) and updates only its own points,
+      ! NORTH: 1..flux_tube_midpoint(lp), SOUTH: midpoint+1..flux_tube_max(lp)
+      ! (same split as Calculate_ExB_Velocity). Only *_old arrays and grid
+      ! data are read below, so the two legs are independent. When both legs
+      ! have the same drift (always for exb_hemispheric = 0) this is identical
+      ! to the previous whole-tube update. (Body not re-indented: minimal diff.)
+      DO ihem = NORTH, SOUTH
+
+        IF ( ihem == NORTH ) THEN
+          i_lo = 1
+          i_hi = grid % flux_tube_midpoint(lp)
+        ELSE
+          i_lo = grid % flux_tube_midpoint(lp) + 1
+          i_hi = grid % flux_tube_max(lp)
+        ENDIF
+        ! Warnings are issued once per distinct Lagrangian origin: the SOUTH
+        ! leg only reports if its drift differs from the NORTH leg.
+        report_leg = ( ihem == NORTH ) .OR. &
+                     ANY( v_ExB(1:2,lp,mp,SOUTH) /= v_ExB(1:2,lp,mp,NORTH) )
+
         i_convection_too_far_in_lp = .FALSE.
 
         ! Calculate the latitude (theta) and longitude (phi) of the point where
         ! the plasma came from
 
         if (abs(sin( colat_90km(lp) )) > 1.0e-15_prec) then
-            phi_t0 = grid % magnetic_longitude(mp) - v_ExB(1,lp,mp)*time_step/(r*sin( colat_90km(lp) ) )
+            phi_t0 = grid % magnetic_longitude(mp) - v_ExB(1,lp,mp,ihem)*time_step/(r*sin( colat_90km(lp) ) )
         else
             phi_t0 = grid % magnetic_longitude(mp)
         endif
@@ -1001,7 +1043,7 @@ CONTAINS
         coslam = cos( half_pi - grid % magnetic_colatitude(1,lp) )
         sinim  = 2.0_prec*sqrt( 1.0_prec - coslam*coslam )/sqrt( 4.0_prec - 3.0_prec*coslam*coslam )
         if (abs(sinim) > 1.0e-15_prec) then
-            theta_t0 = colat_90km(lp) - v_ExB(2,lp,mp)*time_step/(r*sinim)
+            theta_t0 = colat_90km(lp) - v_ExB(2,lp,mp,ihem)*time_step/(r*sinim)
         else
             theta_t0 = colat_90km(lp)
         endif
@@ -1080,9 +1122,15 @@ CONTAINS
 
           IF( lp_min == 0 )THEN
             i_convection_too_far_in_lp = .TRUE.
-            write(errmsg,*) 'GHGM convection too far ', mp , lp
+            IF ( report_leg ) THEN
+            IF ( ihem == NORTH ) THEN
+              write(errmsg,*) 'GHGM convection too far ', mp , lp
+            ELSE
+              write(errmsg,*) 'GHGM convection too far (SH leg) ', mp , lp
+            ENDIF
             CALL ipe_warning_log( msg=errmsg, line=__LINE__, file=__FILE__ )
-            write(*,*) '  -> theta_t0(deg), colat (deg), ExB : ', theta_t0*180/3.14, colat_90km(lp)*180/3.14, v_ExB(2,lp,mp)
+            write(*,*) '  -> theta_t0(deg), colat (deg), ExB : ', theta_t0*180/3.14, colat_90km(lp)*180/3.14, v_ExB(2,lp,mp,ihem)
+            ENDIF
 
           ENDIF
 
@@ -1133,7 +1181,7 @@ CONTAINS
 
           IF( lp_min == 1 )THEN  ! lp_min == 1
 
-            DO i = 1, grid % flux_tube_max(lp)
+            DO i = i_lo, i_hi
 
               plasma % ion_densities(1:n_conv_spec,i,lp,mp) = ion_densities_pole_value(1:n_conv_spec,i)
               plasma % ion_velocities(1:n_conv_spec,i,lp,mp) = ion_velocities_pole_value(1:n_conv_spec,i)
@@ -1148,7 +1196,7 @@ CONTAINS
               if(lp_t0(2).eq.0) then
                 lp_t0(1) = 1
                 lp_t0(2) = 2
-                write(6,*) 'GHGM LP_T0 ',mp,lp,v_ExB(1,lp,mp), v_ExB(2,lp,mp)
+                IF ( report_leg ) write(6,*) 'GHGM LP_T0 ',mp,lp,v_ExB(1,lp,mp,ihem), v_ExB(2,lp,mp,ihem)
               endif
 
              if(lp_t0(2).eq.lp_t0(1)) then
@@ -1159,7 +1207,7 @@ CONTAINS
                 lp_comp_weight(2) = -( theta_t0 - colat_90km(lp_t0(1)) )/( colat_90km(lp_t0(1))-colat_90km(lp_t0(2)) )
              endif
 
-            DO 300 i = 1, grid % flux_tube_max(lp)
+            DO 300 i = i_lo, i_hi
 
               ! q interpolation
               q_value = grid % q_factor(i,lp,mp)
@@ -1296,9 +1344,11 @@ CONTAINS
               plasma % ion_temperature(i,lp,mp) = ion_temperature_int*( ksi_fac**(4.0_prec/3.0_prec) )
               plasma % electron_temperature(i,lp,mp) = electron_temperature_int*( ksi_fac**(4.0_prec/3.0_prec) )
 
- 300        CONTINUE  !  i = 1, grid % flux_tube_max(lp)
+ 300        CONTINUE  !  i = i_lo, i_hi (points of hemispheric leg ihem)
 
           ENDIF ! lp_min =/= 1
+
+      ENDDO ! ihem = NORTH, SOUTH
 
  200    CONTINUE
  100  CONTINUE
@@ -1402,7 +1452,13 @@ CONTAINS
     !   - ch
     !--------------------------------------------------------------------------
 
-    nMlts = plasma % mp_high - plasma % mp_low + 1
+    ! NOTE: do not reset the module variable nMlts here. The MILE arrays
+    ! (mlts2d, lats2d, eflux2d, avee2d, area2d) are allocated with the halo
+    ! columns included (nMlts = iEnd - iStart + 1 in Build). Resetting it to
+    ! the halo-less count made mile_prepare_aurora_grid pass the wrong leading
+    ! dimension to the IE library from the second step on, so the library wrote
+    ! only the first part of eflux2d/avee2d and the southern-hemisphere rows
+    ! stayed frozen at their first-step values.
     nLats = (grid % NLP) * 2
 
     ! Here we assume a uniform longitude:
@@ -1586,6 +1642,9 @@ CONTAINS
             else
                plasma % aurora_eflux2d(lp, mp) = eflux
                plasma % aurora_avee2d(lp, mp) = ch * 2
+               ! TIROS path uses |mlat| -> hemispherically symmetric:
+               plasma % aurora_eflux2d_s(lp, mp) = eflux
+               plasma % aurora_avee2d_s(lp, mp) = ch * 2
 
             endif
 #endif

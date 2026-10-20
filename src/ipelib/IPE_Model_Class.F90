@@ -4,6 +4,7 @@
 MODULE IPE_Model_Class
 
   USE IPE_Precision
+  USE IPE_Constants_Dictionary, ONLY : NORTH, SOUTH
   USE IPE_Model_Parameters_Class
   USE IPE_Time_Class
   USE IPE_Grid_Class
@@ -767,16 +768,34 @@ CONTAINS
 
     ! Write out electric field stuff:
     CALL ipe % io % write("ElectricPotential", &
-        ipe % eldyn % electric_potential(1:ipe % grid % NLP, ipe % mpi_layer % mp_low:ipe % mpi_layer % mp_high))
+        ipe % eldyn % electric_potential(1:ipe % grid % NLP, ipe % mpi_layer % mp_low:ipe % mpi_layer % mp_high, NORTH))
     IF (ipe % io % err % check(msg="Unable to write dataset ElectricPotential", &
         file=__FILE__, line=__LINE__)) RETURN
-    CALL ipe % io % write("ExB_East", &
-        ipe % eldyn % v_ExB_apex(1, 1:ipe % grid % NLP, ipe % mpi_layer % mp_low:ipe % mpi_layer % mp_high))
-    IF (ipe % io % err % check(msg="Unable to write dataset ExB_East", &
+    ! Southern-hemisphere footpoint slot of the same potential [V]
+    ! (electric_potential(:,:,SOUTH)); equal to ElectricPotential when
+    ! exb_hemispheric = 0. Lets NH/SH potential asymmetry be diagnosed directly.
+    CALL ipe % io % write("ElectricPotential_S", &
+        ipe % eldyn % electric_potential(1:ipe % grid % NLP, ipe % mpi_layer % mp_low:ipe % mpi_layer % mp_high, SOUTH))
+    IF (ipe % io % err % check(msg="Unable to write dataset ElectricPotential_S", &
         file=__FILE__, line=__LINE__)) RETURN
-    CALL ipe % io % write("ExB_North", &
-        ipe % eldyn % v_ExB_apex(2, 1:ipe % grid % NLP, ipe % mpi_layer % mp_low:ipe % mpi_layer % mp_high))
-    IF (ipe % io % err % check(msg="Unable to write dataset ExB_East", &
+    CALL ipe % io % write("ExB_apex_e1_N", &
+        ipe % eldyn % v_ExB_apex(1, 1:ipe % grid % NLP, ipe % mpi_layer % mp_low:ipe % mpi_layer % mp_high, NORTH))
+    IF (ipe % io % err % check(msg="Unable to write dataset ExB_apex_e1_N", &
+        file=__FILE__, line=__LINE__)) RETURN
+    CALL ipe % io % write("ExB_apex_e2_N", &
+        ipe % eldyn % v_ExB_apex(2, 1:ipe % grid % NLP, ipe % mpi_layer % mp_low:ipe % mpi_layer % mp_high, NORTH))
+    IF (ipe % io % err % check(msg="Unable to write dataset ExB_apex_e2_N", &
+        file=__FILE__, line=__LINE__)) RETURN
+    ! Southern-hemisphere leg of the apex ExB drift [m/s], same components as
+    ! ExB_apex_e1_N/ExB_apex_e2_N (v_ExB_apex(1:2,...,SOUTH)); equal to them when
+    ! exb_hemispheric = 0.
+    CALL ipe % io % write("ExB_apex_e1_S", &
+        ipe % eldyn % v_ExB_apex(1, 1:ipe % grid % NLP, ipe % mpi_layer % mp_low:ipe % mpi_layer % mp_high, SOUTH))
+    IF (ipe % io % err % check(msg="Unable to write dataset ExB_apex_e1_S", &
+        file=__FILE__, line=__LINE__)) RETURN
+    CALL ipe % io % write("ExB_apex_e2_S", &
+        ipe % eldyn % v_ExB_apex(2, 1:ipe % grid % NLP, ipe % mpi_layer % mp_low:ipe % mpi_layer % mp_high, SOUTH))
+    IF (ipe % io % err % check(msg="Unable to write dataset ExB_apex_e2_S", &
         file=__FILE__, line=__LINE__)) RETURN
 
     CALL ipe % io % write("EFlux", &
@@ -786,6 +805,15 @@ CONTAINS
     CALL ipe % io % write("AveE", &
         ipe % plasma % aurora_avee2d(1:ipe % grid % NLP, ipe % mpi_layer % mp_low:ipe % mpi_layer % mp_high))
     IF (ipe % io % err % check(msg="Unable to write dataset AveE", &
+        file=__FILE__, line=__LINE__)) RETURN
+    ! Southern-hemisphere foot-point drivers:
+    CALL ipe % io % write("EFlux_S", &
+        ipe % plasma % aurora_eflux2d_s(1:ipe % grid % NLP, ipe % mpi_layer % mp_low:ipe % mpi_layer % mp_high))
+    IF (ipe % io % err % check(msg="Unable to write dataset EFlux_S", &
+        file=__FILE__, line=__LINE__)) RETURN
+    CALL ipe % io % write("AveE_S", &
+        ipe % plasma % aurora_avee2d_s(1:ipe % grid % NLP, ipe % mpi_layer % mp_low:ipe % mpi_layer % mp_high))
+    IF (ipe % io % err % check(msg="Unable to write dataset AveE_S", &
         file=__FILE__, line=__LINE__)) RETURN
 
     ! Close HDF5 file

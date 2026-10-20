@@ -4,6 +4,7 @@ config.status
 autom4te.cache/
 ipe.mk
 **/Makefile
+INSTALL.mac.m3max.original
 
 # compiler output
 *.o
@@ -23,5 +24,13 @@ test/fcst.log
 test/test.diff
 test/test_all.diff
 
+test/fetch_sme_indices.py
+test/plot_aurora_drivers_dial.py
+test/plot_molecular_ions_tube.py
+test/plot_ne120_aurora_check.py
+test/plot_ne_polar_dial.py
+
 # Python
 __pycache__
+
+.DS_Store

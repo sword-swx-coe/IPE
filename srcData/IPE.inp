@@ -46,6 +46,12 @@
   TRANSPORT_HIGHLAT_LP   = 30,
   PERP_TRANSPORT_MAX_LP  = 151,
   VERTICAL_WIND_LIMIT    = 100.0,
+  ! EXB_HEMISPHERIC: 0 = one ExB drift per flux tube from the NH footpoint (legacy),
+  !   1 = separate NH/SH drifts, each hemispheric leg transported with its own drift.
+  !   Remove this line for binaries older than this option (the namelist read error is
+  !   silently ignored). The 2-D output names changed with it:
+  !   ExB_East -> ExB_apex_e1_N, ExB_North -> ExB_apex_e2_N, plus new ExB_apex_e1_S/e2_S.
+  EXB_HEMISPHERIC        = 0,
 /
 &MILE
   MILE_VERBOSE = 2,
