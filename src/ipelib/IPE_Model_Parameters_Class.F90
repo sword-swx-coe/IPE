@@ -75,6 +75,7 @@ MODULE IPE_Model_Parameters_Class
 
      !FileIO
      LOGICAL        :: read_apex_neutrals
+     LOGICAL        :: msis_on_restart
      LOGICAL        :: read_geographic_neutrals
      LOGICAL        :: write_apex_neutrals
      LOGICAL        :: write_geographic_neutrals
@@ -155,6 +156,7 @@ CONTAINS
     INTEGER        :: f107_kp_read_in_start
     CHARACTER(200) :: f107_kp_file
     LOGICAL        :: read_apex_neutrals
+    LOGICAL        :: msis_on_restart
     LOGICAL        :: read_geographic_neutrals
     LOGICAL        :: write_apex_neutrals
     LOGICAL        :: write_geographic_neutrals
@@ -244,7 +246,7 @@ CONTAINS
          solarwind_By, solarwind_angle, &
          solarwind_velocity, solarwind_Bz, solarwind_density
     NAMELIST / FileIO / &
-         read_apex_neutrals, read_geographic_neutrals, &
+         read_apex_neutrals, msis_on_restart, read_geographic_neutrals, &
          write_apex_neutrals, write_geographic_neutrals, &
          write_geographic_eldyn, write_apex_eldyn, &
          file_output_frequency, file_prefix, file_extension, &
@@ -310,6 +312,11 @@ CONTAINS
 
     ! FileIO !
     read_apex_neutrals        = .TRUE.
+    ! When restarting from a state file with read_apex_neutrals = T, call MSIS/HWM at the first
+    ! step (elapsed_sec = 0) as an uninterrupted run would have, so that a checkpoint restart is
+    ! bit-identical to the continuous run. Default F keeps the historical behaviour (the file's
+    ! neutrals are used until the first MSIS_TIME_STEP boundary).
+    msis_on_restart           = .FALSE.
     read_geographic_neutrals  = .TRUE.
     write_apex_neutrals       = .TRUE.
     write_geographic_neutrals = .TRUE.
@@ -578,6 +585,7 @@ CONTAINS
    params % nhemi_power_index         = nhemi_power_index
    params % shemi_power_index         = shemi_power_index
    params % read_apex_neutrals        = read_apex_neutrals
+   params % msis_on_restart           = msis_on_restart
    params % read_geographic_neutrals  = read_geographic_neutrals
    params % write_apex_neutrals       = write_apex_neutrals
    params % write_geographic_neutrals = write_geographic_neutrals

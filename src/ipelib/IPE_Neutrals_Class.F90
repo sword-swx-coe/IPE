@@ -222,6 +222,7 @@ CONTAINS
 
     IF ( msis_switch .and. &
          (time % elapsed_sec > 0._prec .or. &
+          params % msis_on_restart .or. &
          .NOT. params % read_apex_neutrals) ) THEN
       verbose = 0
       IF( mpi_layer % rank_id == 0 ) then
