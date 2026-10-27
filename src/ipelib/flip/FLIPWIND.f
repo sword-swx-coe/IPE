@@ -508,6 +508,7 @@ C
       HMORWN=NINT(HMFWND)
       READ(JUNIT,*) NUMSAV
       READ(JUNIT,*) (NCOLS(ICOL),ICOL=1,6)
+      NUMCOL=0    !.. initialization fix
       DO ICOL=1,6
          IF(NCOLS(ICOL).NE.0) NUMCOL=ICOL
       ENDDO

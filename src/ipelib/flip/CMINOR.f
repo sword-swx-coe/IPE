@@ -101,6 +101,7 @@ C....... Sep 1989
       ZNE=(B+DSQRT(B**2+4.0*C))/2.0
 
       !.. Loop through chemistry twice to evaluate dF/dh for Newton
+      H=0.0D0     !.. initialization fix
       JITER=0
  9    DO 10 ITS=1,2
         IF(JITER.EQ.0) H=ZNE*0.001

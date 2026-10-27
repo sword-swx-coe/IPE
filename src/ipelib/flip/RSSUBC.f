@@ -292,6 +292,7 @@ C........ described by Richards and Torr JGR 1985 page 5261
       !...... thermal diffusion
       ACON=9E7*TI(2,JR)**2.5/RTS(1)/H0**2
       ZTRAN=Z(JR)-DLOG(ACON/N(1,JR)/ON(JR))*H1*H2/(H1+H2)
+      JS=JR       !.. initialization fix
       DO 717 J=1,JQ
  717  IF(Z(J).LT.ZTRAN) JS=J
       IF(ZTRAN.LE.Z(1).OR.ZTRAN.GT.3000.) JS=JR
@@ -549,6 +550,7 @@ C::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
       COMMON/GPAR/RE,PLAT,PLON,PI,ANGVEL
       !...... If not a new field line then read dummy variables so they
       !...... are not altered
+      GLATD=0.0   !.. initialization fix
       IF(ISOL.NE.0) THEN
          READ(15,*) DUMVAR
          READ(5,*)  L_SHORT

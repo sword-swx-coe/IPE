@@ -21,8 +21,8 @@ C:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
       DIMENSION A(N,IW),B(N),X(N),SCALE(N),INDEX(N),S(N,IW)
       character*4 which_call_str
       KDIM=0
+      IBW=2*M+1   !.. initialization fix: needed on the KS.NE.0 path too
 103   IF(KS.NE.0) GO TO 126
-      IBW=2*M+1
 C ...... modification here by PR Aug 91
       IF(M.GT.N-1) THEN
          SELECT CASE (i_which_call)

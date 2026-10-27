@@ -92,6 +92,8 @@ C... This routine prints FLIP diagnostics
       COMMON/GPAR/RE,PLAT,PLON,PI,ANGVEL
       COMMON/CFACT/DHDU_FAC,COLFAC,CFAC(9),ISCH(9)
       DATA JJJ/0/
+      SAVE NETHFLX,NETOFLX   !.. initialization fix: running totals across calls
+      DATA NETHFLX,NETOFLX/0.0D0,0.0D0/
       !......... printing densities and temperatures in UNIT=8 ....
  453  UTHRS=SEC/3600.0
 
@@ -107,6 +109,7 @@ C... This routine prints FLIP diagnostics
       !.. determine the indices for printing 
       JZLON=JQ
       J300=JQ
+      J180K=JB    !.. initialization fix: default if no point above 180 km
       DO JS=1,JQ
          J=JQ-JS+1                      !.. coming down in altitude
          IF(Z(J).GE.ZLO) JZLON=J        !.. index for specified altitude

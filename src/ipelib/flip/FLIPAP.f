@@ -186,6 +186,7 @@ C..... Written by P. Richards March 2009.
       K=0
       UTAP=0.0  !.. only used for debugging
       !.. Read in the F107 and Kp data
+      KDAY=0      !.. initialization fix
       DO I=1,APDIM-1
         !.. Convert year, month, day to YYYYddd format
         CALL CONVT_DATE(MM,DD,DDD,YYYY)

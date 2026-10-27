@@ -89,6 +89,8 @@ C-------------------------------------------------------------------
       IMPLICIT NONE
       INTEGER ION        !.. number of ions to solve = 2 (O+,H+)
       INTEGER I,K,IUN    !.. I, K= loop control, IUN= unit to write
+      SAVE IUN           !.. initialization fix: 'write header once' logic needs a saved unit
+      DATA IUN/0/
       INTEGER J,JSJ      !.. See I/O parameters
       DOUBLE PRECISION ion_density(4,FLDIM),TI(3,FLDIM),V(2),FLUX(2)
       DOUBLE PRECISION MASS(4),A(4)      !.. Mass and atomic # of O+,H+, He+
@@ -198,6 +200,8 @@ C-------------------------------------------------------------------
       INTEGER J,JSJ    !.. See I/O parameters
       INTEGER I,K,L        !.. loop control variables, IUN unit #
       INTEGER IUN          !.. IUN unit #
+      SAVE IUN             !.. initialization fix
+      DATA IUN/0/
       !.. Collision related stuff (see I/O comments)      
       DOUBLE PRECISION PP(4),D(4),GAMMA(4),ALPHA(4,4),ALPHAS(4,4),
      >   B(4,4),MASS(4),A(4)

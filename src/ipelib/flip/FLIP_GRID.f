@@ -170,6 +170,7 @@ C....            pp. 389-409, 1983.
 
       JQ=(JMAX+1)/2    !.. Equatorial grid point
 
+      SREF=0.0D0  !.. initialization fix
       DO J=1,JQ
         CALL FIELD(J,JMAX,PCO,RE,SCAL,SCALK,Q(J), X(J),FD)
         IF(J.EQ.1) SREF=FD(8)*1.E5         ! distance along magnetic field

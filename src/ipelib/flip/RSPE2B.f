@@ -129,6 +129,8 @@ C... FRPAS= fraction of flux lost in plasmasphere
      >   RJOX,RJN2,RJO2,RJHE)
 
       j_apex=(JMAX+1)/2
+      IPAS=JMIN   !.. initialization fix: defined even if no point lies below ZPAS
+      PASK=0.0    !.. initialization fix: defined even if VTOT*BM(j120N) <= 0
 
       !.. Set pitch angle trapping factor. FPAS is controlled by input
       !.. parameter FRPAS. There are several options. NOTE - to find
@@ -565,8 +567,13 @@ C..... be written to avoid this if necessary.
       DOUBLE PRECISION BM(FLDIM),Z(FLDIM)
       !.. RBM used in pitch angle variation
       RBM=0.667/BM(M)
+      RAVMU=1.73   !.. initialization fix (see loop below)
       DO 56 J=JMIN,JMAX
       !.. pitch angle variation above Z(M)
+      !.. RAVMU is left unchanged at Z(J) == Z(M) (the reference point and its
+      !.. conjugate), i.e. it keeps the value of the previous point J-1, which is
+      !.. what the original code did implicitly; RAVMU is now initialised before
+      !.. the loop so that this is defined on the first point as well.
       IF(Z(J).GT.Z(M)) RAVMU=1.0/SQRT(1.0-BM(J)*RBM)
       IF(Z(J).LT.Z(M)) RAVMU=1.73
       !.. To reset after solution

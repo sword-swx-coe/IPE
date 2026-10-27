@@ -401,6 +401,7 @@ C.. Modified in April 20008 to write warnings in multiple files
       !.. call RATS with standard temperature TSTAND = 999
       TSTAND = 999.0
       CALL RATS(1,TSTAND,TSTAND,TSTAND,RTS)
+      RATIO=1.0   !.. initialization fix
       DO 20 I=1,98
       IF(R(I).GT.0) RATIO=RTS(I)/R(I)
       IF(R(I).LE.0.AND.RTS(I).EQ.0) RATIO=1.0
