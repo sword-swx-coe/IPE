@@ -116,12 +116,17 @@ C... FRPAS= fraction of flux lost in plasmasphere
            PROB(I_energy)=0.2526*EXP(-0.2526*E(I_energy))
  200     CONTINUE
 
-      !.. Get production frequencies (RJOX,RJN2,RJO2,RJHE) for the energy cells
-      IF(ABS((F107-F107SV)/F107).GE.0.05) THEN
-        F107SV=F107
-        CALL CONVF_EUVAC(IEMAX,F107,F107A,E,DELTE,UVFAC,
+      !.. Get production frequencies (RJOX,RJN2,RJO2,RJHE) for the energy cells.
+      !.. Computed on every call. The original code recomputed them only when
+      !.. F10.7 had changed by >= 5% since the SAVEd F107SV, but RJOX..RJHE are
+      !.. automatic (stack) arrays, so every call after the first reused whatever
+      !.. the previous call had left on the stack: valid for consecutive tubes of
+      !.. one time step, garbage for the first tube of each step (zero secondary
+      !.. ionization, wrong heating), and history dependent, which also made
+      !.. checkpoint restarts inexact. Cost of CONVF_EUVAC is negligible.
+      F107SV=F107
+      CALL CONVF_EUVAC(IEMAX,F107,F107A,E,DELTE,UVFAC,
      >   RJOX,RJN2,RJO2,RJHE)
-      ENDIF  !.. Endif F107
 
       j_apex=(JMAX+1)/2
 
