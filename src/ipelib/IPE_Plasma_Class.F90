@@ -822,6 +822,11 @@ CONTAINS
     INTEGER    :: i, lp, mp, j
 #ifdef HAVE_MPI
     INTEGER    :: error
+    INTEGER    :: nt1
+    REAL(prec) :: dens_gather(1:n_conv_spec, 1:grid % flux_tube_max(1), 0:mpi_layer % n_ranks-1)
+    REAL(prec) :: vel_gather(1:n_conv_spec, 1:grid % flux_tube_max(1), 0:mpi_layer % n_ranks-1)
+    REAL(prec) :: ti_gather(1:grid % flux_tube_max(1), 0:mpi_layer % n_ranks-1)
+    REAL(prec) :: te_gather(1:grid % flux_tube_max(1), 0:mpi_layer % n_ranks-1)
 #endif
 
       ion_densities_pole_value_loc      = 0.0_prec
@@ -845,37 +850,30 @@ CONTAINS
         ENDDO
       ENDDO
 #ifdef HAVE_MPI
-      CALL MPI_ALLREDUCE( ion_densities_pole_value_loc, &
-                          ion_densities_pole_value, &
-                          n_conv_spec*grid % flux_tube_max(1), &
-                          mpi_layer % mpi_prec, &
-                          MPI_SUM, &
-                          mpi_layer % mpi_communicator, &
-                          error )
-
-      CALL MPI_ALLREDUCE( ion_temperature_pole_value_loc, &
-                          ion_temperature_pole_value, &
-                          grid % flux_tube_max(1), &
-                          mpi_layer % mpi_prec, &
-                          MPI_SUM, &
-                          mpi_layer % mpi_communicator, &
-                          error )
-
-      CALL MPI_ALLREDUCE( ion_velocities_pole_value_loc, &
-                          ion_velocities_pole_value, &
-                          n_conv_spec*grid % flux_tube_max(1), &
-                          mpi_layer % mpi_prec, &
-                          MPI_SUM, &
-                          mpi_layer % mpi_communicator, &
-                          error )
-
-      CALL MPI_ALLREDUCE( electron_temperature_pole_value_loc, &
-                          electron_temperature_pole_value, &
-                          grid % flux_tube_max(1), &
-                          mpi_layer % mpi_prec, &
-                          MPI_SUM, &
-                          mpi_layer % mpi_communicator, &
-                          error )
+      ! Reproducible reduction: gather every rank's partial sums and add them
+      ! in rank order on all ranks. MPI_ALLREDUCE(MPI_SUM) may apply a different
+      ! summation order in one process than in another (a freshly started
+      ! process vs. a long-running one), which made the pole values differ in
+      ! the last bit and broke bit-exact checkpoint restarts.
+      nt1 = grid % flux_tube_max(1)
+      CALL MPI_ALLGATHER( ion_densities_pole_value_loc(1:n_conv_spec,1:nt1), n_conv_spec*nt1, mpi_layer % mpi_prec, &
+                          dens_gather, n_conv_spec*nt1, mpi_layer % mpi_prec, mpi_layer % mpi_communicator, error )
+      CALL MPI_ALLGATHER( ion_velocities_pole_value_loc(1:n_conv_spec,1:nt1), n_conv_spec*nt1, mpi_layer % mpi_prec, &
+                          vel_gather, n_conv_spec*nt1, mpi_layer % mpi_prec, mpi_layer % mpi_communicator, error )
+      CALL MPI_ALLGATHER( ion_temperature_pole_value_loc(1:nt1), nt1, mpi_layer % mpi_prec, &
+                          ti_gather, nt1, mpi_layer % mpi_prec, mpi_layer % mpi_communicator, error )
+      CALL MPI_ALLGATHER( electron_temperature_pole_value_loc(1:nt1), nt1, mpi_layer % mpi_prec, &
+                          te_gather, nt1, mpi_layer % mpi_prec, mpi_layer % mpi_communicator, error )
+      ion_densities_pole_value        = 0.0_prec
+      ion_velocities_pole_value       = 0.0_prec
+      ion_temperature_pole_value      = 0.0_prec
+      electron_temperature_pole_value = 0.0_prec
+      DO j = 0, mpi_layer % n_ranks - 1
+        ion_densities_pole_value(:,1:nt1)      = ion_densities_pole_value(:,1:nt1)      + dens_gather(:,:,j)
+        ion_velocities_pole_value(:,1:nt1)     = ion_velocities_pole_value(:,1:nt1)     + vel_gather(:,:,j)
+        ion_temperature_pole_value(1:nt1)      = ion_temperature_pole_value(1:nt1)      + ti_gather(:,j)
+        electron_temperature_pole_value(1:nt1) = electron_temperature_pole_value(1:nt1) + te_gather(:,j)
+      ENDDO
 
       ion_densities_pole_value        = ion_densities_pole_value/REAL( plasma % NMP )
       ion_temperature_pole_value      = ion_temperature_pole_value/REAL( plasma % NMP )
