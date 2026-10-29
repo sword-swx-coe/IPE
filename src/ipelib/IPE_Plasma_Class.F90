@@ -1311,7 +1311,15 @@ CONTAINS
               ENDIF
 
               z = grid % altitude(i,lp)/1000.0_prec
-              if ((z.lt.200.0).and.(z.gt.100.0)) then
+              ! Full convection at 200 km tailing off to none at 100 km and
+              ! below (b19f807). Every flux tube has a node at exactly 100 km;
+              ! with "z > 100" that node fell through both branches and kept
+              ! full convection, producing a one-node night-side E-region layer
+              ! (Ne 1e10-1e11 m-3 at 100 km on 2-17 % of columns; found
+              ! 2026-10-26, N. Maruyama, see docs/NIGHT_LAYER_100KM.md).
+              ! ">=" puts the node on the ramp at
+              ! factor 0, the same as the "below 100 km" branch.
+              if ((z.lt.200.0).and.(z.ge.100.0)) then
               z_factor = (z - 100.0) / 100.0
               ion_densities_int(1:n_conv_spec) = &
                    (z_factor * (ion_densities_int(1:n_conv_spec) - &
