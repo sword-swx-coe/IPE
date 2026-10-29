@@ -40,3 +40,5 @@ There a four fundamental Makefiles:
 3. Makefile - this makefile drives the compilation.  It will send the processes into each subdirectory and make each library in the respective subdirectory.
 4. In each subdirectory, there is a Makefile.UM, which this system uses as the makefile. Each Makefile.UM has list of objects to compile and a definition for the library that it will create.
 
+Bit-exact checkpoint restarts (and two FLIP/transport bugs fixed on the way): see
+[docs/RESTART_EXACTNESS.md](docs/RESTART_EXACTNESS.md).
