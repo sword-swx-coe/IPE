@@ -27,15 +27,19 @@ identical to the below-100 km branch.
 Criterion as in the upstream report, Ne(100 km node) / Ne(node nearest 105 km) > 3, on the
 native grid, 27,040 columns (tube x longitude x hemisphere):
 
-| Columns | unfixed 9a3c807 |
-|---|---|
-| all | 4.5 % |
-| night (LT 17-07) | 7.8 % |
-| night, |mlat| 30-60 | 45.0 % (flagged-column median Ne at 100 km 3.7e10 m-3) |
-| night, |mlat| 60-90 | 13.6 % |
-| day | 0.1 % |
+| Columns | unfixed 9a3c807, 00 UT (restart state) | unfixed 9a3c807, 01 UT | fixed ba85e41, 01 UT |
+|---|---|---|---|
+| all | 4.5 % | 3.2 % | 0.0 % |
+| night (LT 17-07) | 7.8 % | 5.4 % | 0.0 % (max ratio 1.1) |
+| night, mlat 30-60 | 45.0 % | 33.1 % (flagged median Ne 3.0e10 m-3) | 0.0 % |
+| night, mlat 60-90 | 13.6 % | 6.9 % | 0.0 % |
+| day | 0.1 % | 0.4 % | 0.0 % |
 
-(The fixed-binary numbers are added below once the one-hour test has run.)
+One-hour runs from the same 2021-11-01 00:00 checkpoint (8 ranks, 300 s step, 12 steps). Effect
+of the fix on the rest of the state after one hour (fixed vs unfixed): Ne at 250-400 km median
+relative change 0.40 % (p95 8 %, max 69 % at isolated points), Ti median 0.008 K, Te median 0.19 K
+(max 118 K); Ne at 95-110 km median 0.000 % (the change is confined to the one node). Check
+script (native-grid criterion above): `check_night_layer_100km.py`, available from the author.
 
 ## Consequences
 
