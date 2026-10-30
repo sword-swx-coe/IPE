@@ -26,12 +26,13 @@ Two of the causes were genuine model bugs that affected every run, restart or no
    is a valid restart point.
 3. For the second segment set, in `IPE.inp`:
    - `&TIMESTEPPING`: `INITIAL_TIMESTAMP` = stamp of the checkpoint; `START_TIME` = UT seconds of
-     that stamp (the driver resets the time of day to it); `END_TIME` shifted accordingly and an
-     integer multiple of `FILE_OUTPUT_FREQUENCY` (the driver loops `END_TIME/FILE_OUTPUT_FREQUENCY`
-     times).
+     that stamp (the driver resets the time of day to it); `END_TIME` = `START_TIME` + the length
+     of the segment, an integer multiple of `FILE_OUTPUT_FREQUENCY` (the driver loops
+     `(END_TIME - START_TIME)/FILE_OUTPUT_FREQUENCY` times).
    - `&FILEIO`: **`MSIS_ON_RESTART = T`** (new switch, default `F` keeps the old behaviour of
      holding the file's neutrals for the first MSIS interval). Without it the first three steps
-     use 15-minute-stale neutrals.
+     use 15-minute-stale neutrals. Check the log: the first `--> Calling MSIS at` line must carry
+     the restart time, not 15 minutes later.
    - Forcing files (F10.7/Kp, SME) are indexed by absolute date on this branch; on branches that
      index by record, set `F107_KP_SKIP_SIZE` to the restart offset.
 4. Both segments must use the same binary and the same number of MPI ranks.
@@ -60,6 +61,20 @@ Rates: RATIO; RSSUBC: JS, GLATD; RSDENA_EXB: IUN; FLIPSUBS: J180K, NETHFLX, NETO
 FLIPWIND: NUMCOL; FLIPAP: KDAY; FLIP_GRID: SREF. All set explicitly to the value the code relied
 on implicitly, so results are unchanged. Note on RAVMU: at `Z(J) == Z(M)` the legacy code reuses
 the previous point's pitch-angle factor; that behaviour is kept and left as a physics question.
+
+## The deck must parse: namelist errors are now fatal
+
+Until 2026-10-30 IPE read each namelist group with `IOSTAT` captured but never checked. A
+malformed group aborted its READ silently and every variable listed *after* the bad token kept its
+default. The usual trigger is an unquoted string, `FILE_PREFIX = IPE_State.apex.` or
+`FILE_EXTENSION = .nc` (gfortran IOSTAT 5010), which many hand-written decks carry; any
+`MSIS_ON_RESTART = T` placed after it was lost, and the restart was not exact although the deck
+said it should be. `Build_IPE_Model_Parameters` now stops the run with
+
+    IPE000: ERROR - IPE_Model_Parameters_Class.F90:NNN  Syntax error in namelist group &FileIO of IPE.inp (check for unquoted strings or misspelt names)
+
+Quote every string value. A group that is absent from `IPE.inp` is still allowed (the sample
+deck has no `&INDICESFILES`); Intel reports it with a note, gfortran cannot tell.
 
 ## Consequences for existing results
 

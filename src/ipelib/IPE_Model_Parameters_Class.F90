@@ -437,15 +437,32 @@ CONTAINS
         line=__LINE__, file=__FILE__, rc=rc ) ) RETURN
 #endif
 
+      ! Every namelist READ is checked. A malformed group (e.g. an unquoted
+      ! string value such as FILE_EXTENSION = .nc) used to abort the READ
+      ! silently, leaving every variable listed after the bad token at its
+      ! default; MSIS_ON_RESTART was lost that way (2026-10-30). A positive
+      ! IOSTAT is now fatal. A group that is absent from IPE.inp is allowed,
+      ! since decks legitimately omit some groups (srcData/IPE.inp has no
+      ! &INDICESFILES); compilers that report it (IOSTAT < 0) get a note,
+      ! gfortran returns 0 for an absent group in an internal file.
       READ(cInputFileBuffer, NML = SpaceManagement, IOSTAT = iostatus )
+      IF ( namelist_read_failed( iostatus, "SpaceManagement", __LINE__, rc ) ) RETURN
       READ(cInputFileBuffer, NML = TimeStepping, IOSTAT = iostatus )
+      IF ( namelist_read_failed( iostatus, "TimeStepping", __LINE__, rc ) ) RETURN
       READ(cInputFileBuffer, NML = Forcing, IOSTAT = iostatus )
+      IF ( namelist_read_failed( iostatus, "Forcing", __LINE__, rc ) ) RETURN
       READ(cInputFileBuffer, NML = FileIO, IOSTAT = iostatus )
+      IF ( namelist_read_failed( iostatus, "FileIO", __LINE__, rc ) ) RETURN
       READ(cInputFileBuffer, NML = IPECAP, IOSTAT = iostatus )
+      IF ( namelist_read_failed( iostatus, "IPECAP", __LINE__, rc ) ) RETURN
       READ(cInputFileBuffer, NML = ElDyn, IOSTAT = iostatus )
+      IF ( namelist_read_failed( iostatus, "ElDyn", __LINE__, rc ) ) RETURN
       READ(cInputFileBuffer, NML = Operational, IOSTAT = iostatus )
+      IF ( namelist_read_failed( iostatus, "Operational", __LINE__, rc ) ) RETURN
       READ(cInputFileBuffer, NML = MILE, IOSTAT = iostatus )
+      IF ( namelist_read_failed( iostatus, "MILE", __LINE__, rc ) ) RETURN
       READ(cInputFileBuffer, NML = INDICESFILES, IOSTAT = iostatus )
+      IF ( namelist_read_failed( iostatus, "INDICESFILES", __LINE__, rc ) ) RETURN
 
       !READ( UNIT = fUnit, NML = SpaceManagement, IOSTAT = iostatus )
       !IF ( ipe_iostatus_check( iostatus, &
@@ -685,6 +702,30 @@ CONTAINS
       useMile = .true.
    endif
    
+  CONTAINS
+
+    LOGICAL FUNCTION namelist_read_failed( status, group, line, rc )
+      ! .TRUE. (and rc set) when the namelist READ of GROUP hit a syntax
+      ! error (IOSTAT > 0). An absent group is only noted on rank 0, and only
+      ! by compilers that flag it with IOSTAT < 0 (Intel); gfortran gives 0.
+      INTEGER,          INTENT(in)  :: status
+      CHARACTER(len=*), INTENT(in)  :: group
+      INTEGER,          INTENT(in)  :: line
+      INTEGER, OPTIONAL, INTENT(out) :: rc
+
+      namelist_read_failed = .FALSE.
+      IF ( status > 0 ) THEN
+        namelist_read_failed = ipe_status_check( .FALSE., &
+             msg="Syntax error in namelist group &"//TRIM(group)// &
+                 " of IPE.inp (check for unquoted strings or misspelt names)", &
+             line=line, file=__FILE__, rc=rc )
+      ELSE IF ( status < 0 ) THEN
+        IF ( mpi_layer % rank_id == 0 ) &
+          WRITE(*,*) "-> namelist group &"//TRIM(group)// &
+                     " not found in IPE.inp; using defaults"
+      ENDIF
+    END FUNCTION namelist_read_failed
+
  END SUBROUTINE Build_IPE_Model_Parameters
 
 END MODULE IPE_Model_Parameters_Class
