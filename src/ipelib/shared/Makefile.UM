@@ -13,5 +13,6 @@ LIB:
 
 ${MY_LIB}: ${MF} ${MODULES} ${OBJECTS}
 	@echo '--> Creating Shared library <--'
+	@mkdir -p ${LIBDIR}
 	@rm -f ${MY_LIB}
 	${AR} ${MY_LIB} ${MODULES} ${OBJECTS}

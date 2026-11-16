@@ -17,6 +17,10 @@ def parse_args(buildDir, makefileConf):
     parser.add_argument('-name', \
                         help = 'job name', \
                         default = 'boring_name')
+    parser.add_argument(
+        '--comio_dir',
+        help='path to COMIO install (required if COMIO was configured with --prefix)',
+        default='/usr/local')
 
     front = buildDir + '/' + makefileConf + '.'
     first = len(front)
@@ -184,7 +188,7 @@ if (os.path.exists(buildDir + '/' + mainMakefileConf)):
     command = 'rm -f ' + buildDir + '/' + mainMakefileConf
     run_command(command)
 if (os.path.exists(buildDir + '/' + confFile)):
-    command = 'cd ' + buildDir + '; ln -s ' + confFile + ' ' + mainMakefileConf
+    command = 'cd ' + buildDir + '; cp ' + confFile + ' ' + mainMakefileConf
     run_command(command)
 else:
     print('Could not find file : ' + buildDir + '/' + confFile)
@@ -228,3 +232,27 @@ run_command(command)
 command = 'ln -s build/Makefile.um.maindir ./Makefile'
 run_command(command)
 
+# Write Makefile.local in Electrodynamics & srcIndices
+makefile_local_Template = \
+    f"""
+BUILDDIR  := {mainDir}/build/
+DIRSFILE := {mainDir}/build/Makefile.dirs
+"""
+for lib in ['srcIndices', 'Electrodynamics']:
+    with open(os.path.join(mainDir, 'ext', lib, 'build/Makefile.local'), 'w') as f:
+        f.write(makefile_local_Template)
+
+
+# Change the path to COMIO, if it's in the Makefile.conf
+# Nothing happens if string is not matched, or file is not found.
+# Default comio_dir is to default install location
+try:
+    # open once, read, store
+    with open('build/Makefile.conf', 'r') as f:
+        lines = f.readlines()
+    # open again, this time to replace the contents
+    with open('build/Makefile.conf', 'w') as f:
+        for line in lines:
+            f.write(line.replace('REPLACE_ME', args.comio_dir))
+except FileNotFoundError:
+    print('Makefile.conf not found, that is ok!')

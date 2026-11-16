@@ -1,5 +1,9 @@
 
 SHELL=/bin/sh
+ESMF_MAKE_FILE := $(shell echo $$ESMFMKFILE)
+include ${ESMF_MAKE_FILE}
+
+COMIO_DIR = REPLACE_ME
 
 # define compilers and linker:
 COMPILE.f77 = ${CUSTOMPATH_F}mpifort
@@ -13,20 +17,18 @@ DOUBLEPREC = -frecord-marker=4 -fdefault-real-8 -fdefault-double-8
 PRECISION  =
 
 # These are all the places to look for include and mod files:
-FORTRANMODULES = -I/usr/lib/x86_64-linux-gnu/fortran/gfortran-mod-15/
-INCLUDEDIR = -I/usr/local/include -I/usr/include -I${SHAREDDIR} -I${IODIR}/src -I${MILEDIR}/src
-HDF5INCLUDE = -I/usr/include/hdf5/openmpi
-ESMFMODULES = -I/home/ridley/Software/IPE/ESMF_src/Install/mod/modO/Linux.gfortran.64.mpiuni.default
-ESMFINCLUDE = -I/home/ridley/Software/IPE/ESMF_src/Install/include
-SEARCH = ${FORTRANMODULES} ${INCLUDEDIR} ${HDF5INCLUDE} ${ESMFMODULES} ${ESMFINCLUDE} ${EXTRASEARCH}
+# (we can grab system settings from ESMF_MAKE_FILE)
+INCLUDEDIR = -I${SHAREDDIR} -I${IODIR}/src -I${MILEDIR}/src -I${COMIO_DIR}/include
+SEARCH = ${INCLUDEDIR} ${ESMF_F90COMPILEPATHS} ${EXTRASEARCH}
+
 
 # These are places to look for libraries:
-IPELIBDIRS = -L${MILEDIR}/lib -L${LIBDIR}
-SYSTEMLIBDIRS = -L/usr/local/lib -L/usr/lib/x86_64-linux-gnu -L/usr/lib/x86_64-linux-gnu/hdf5/openmpi/
+IPELIBDIRS = -L${COMIO_DIR}/lib -L${MILEDIR}/lib -L${IODIR}/lib -L${LIBDIR}
+SYSTEMLIBDIRS = ${ESMF_F90ESMFLINKPATHS} ${ESMF_F90LINKRPATHS}
 
 # These are the libraries:
 IPELIBS = -lIPE -lEfield -lDynamo -lFlip -lMsise -lShared -lIE -lIO
-SYSTEMLIBS = -lcomio -lhdf5hl_fortran -lhdf5_hl -lhdf5_fortran -lhdf5 -lcrypto -lcurl -lsz -lz -ldl -lm -lpnetcdf
+SYSTEMLIBS = -lcomio -lpnetcdf
 
 # These are the preprocessor options:
 PreProc = -DHAVE_MPI -DHAVE_MILE -DNEEDMODTIMECONVERT -DNEEDMODIOUNIT
