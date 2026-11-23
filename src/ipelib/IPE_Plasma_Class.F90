@@ -1656,6 +1656,9 @@ CONTAINS
 
               ! Find the two tabulated energies that bracket ch: k is the
               ! lower-energy spectrum and kk is the upper-energy spectrum.
+              ! Default to the highest tabulated interval so that k is defined
+              ! when ch exceeds ionchr(21); the ratio is capped at 1 below.
+              k = 20
               DO kk = 2 , 21
                 IF ( ch <= ionchr(kk) ) THEN
                   k = kk - 1
@@ -1671,7 +1674,8 @@ CONTAINS
               chNorth = ch
               kNorth = k
               kkNorth = kk
-              ratioNorth = chi/diff
+              ! Do not extrapolate beyond the highest tabulated spectrum.
+              ratioNorth = MIN( chi/diff, 1.0_prec )
 
               ! Repeat the same lookup independently for the southern RIM
               ! energy because conjugate footpoints need not have equal input.
@@ -1680,6 +1684,9 @@ CONTAINS
                 ch = 0.379_prec
               ENDIF
 
+              ! Default to the highest tabulated interval so that k is defined
+              ! when ch exceeds ionchr(21); the ratio is capped at 1 below.
+              k = 20
               DO kk = 2 , 21
                 IF ( ch <= ionchr(kk) ) THEN
                   k = kk - 1
@@ -1695,7 +1702,8 @@ CONTAINS
               chSouth = ch
               kSouth = k
               kkSouth = kk
-              ratioSouth = chi/diff
+              ! Do not extrapolate beyond the highest tabulated spectrum.
+              ratioSouth = MIN( chi/diff, 1.0_prec )
             ELSE
               ! Preserve the original TIROS spectrum selection when RIM is not
               ! providing auroral precipitation.
